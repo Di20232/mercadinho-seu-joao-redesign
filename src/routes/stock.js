@@ -5,6 +5,7 @@ const validate = require('../validate');
 const { authenticate, authorize } = require('../auth');
 const { parseDateParam, parseEnumParam, clampIntParam } = require('../queryHelpers');
 const { applyStockDelta } = require('../stockOps');
+const { generateCsv, generateXlsx } = require('../exportService');
 
 const router = express.Router();
 // Movimentações de estoque (entradas de compra e ajustes/perdas) são
@@ -74,6 +75,21 @@ router.post('/adjustments', validate(adjustmentSchema), async (req, res) => {
 
 const MOVEMENT_TYPES = ['ENTRY', 'SALE', 'ADJUSTMENT', 'LOSS'];
 
+async function sendExport(res, format, filenamePrefix, sheetName, headers, rows) {
+  const fmt = (format || 'csv').toLowerCase();
+  if (fmt === 'xlsx') {
+    const buffer = await generateXlsx(sheetName, headers, rows);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filenamePrefix}.xlsx"`);
+    return res.send(buffer);
+  } else {
+    const csv = generateCsv(headers, rows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filenamePrefix}.csv"`);
+    return res.send(csv);
+  }
+}
+
 router.get('/movements', async (req, res) => {
   const { productId } = req.query;
   const type = parseEnumParam(req.query.type, MOVEMENT_TYPES, 'type');
@@ -124,6 +140,44 @@ router.get('/movements', async (req, res) => {
     prisma.stockMovement.count({ where }),
   ]);
   res.json({ totalCount, page, pageSize, movements: movements.map(serialize) });
+});
+
+router.get('/movements/export', async (req, res) => {
+  const { productId } = req.query;
+  const type = parseEnumParam(req.query.type, MOVEMENT_TYPES, 'type');
+  const from = parseDateParam(req.query.from, 'from');
+  let to = parseDateParam(req.query.to, 'to');
+  if (to) to = new Date(to.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+  const where = {};
+  if (productId) where.productId = String(productId);
+  if (type) where.type = type;
+  if (from || to) where.createdAt = {};
+  if (from) where.createdAt.gte = from;
+  if (to) where.createdAt.lte = to;
+
+  const include = { product: { select: { name: true } }, user: { select: { name: true } } };
+  const movements = await prisma.stockMovement.findMany({
+    where,
+    include,
+    orderBy: { createdAt: 'desc' },
+    take: 1000,
+  });
+
+  const headers = ['Data/Hora', 'Produto', 'Tipo', 'Quantidade', 'Estoque Anterior', 'Novo Estoque', 'Motivo', 'Usuário'];
+  const rows = movements.map((m) => [
+    m.createdAt,
+    m.product.name,
+    m.type,
+    Number(m.quantity),
+    Number(m.previousStock),
+    Number(m.newStock),
+    m.reason || '',
+    m.user.name,
+  ]);
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  await sendExport(res, req.query.format, `movimentacoes-estoque_${dateStr}`, 'Movimentações de Estoque', headers, rows);
 });
 
 module.exports = router;

@@ -17,6 +17,13 @@
 #   docker compose exec app npm run seed:products   # opcional
 #   docker compose exec app npm run simulate:sales  # opcional
 #   Acesse http://localhost:3100
+
+# Nome fixo do projeto. Sem ele o Compose usa o nome da pasta, e renomear ou
+# copiar a pasta (como aconteceu de "contro-vend" para "mercadinho-seu-joao")
+# cria um volume novo e vazio: o sistema sobe sem os usuários e vendas que já
+# estavam cadastrados.
+name: mercadinho-seu-joao
+
 services:
   db:
     image: postgres:16-alpine
@@ -71,3 +78,6 @@ services:
 
 volumes:
   mercadinho_joao_db_data:
+    # Nome explícito do volume que já guarda o banco, para não depender do nome
+    # do projeto. Mudar este nome faz o sistema subir com um banco vazio.
+    name: mercadinho-seu-joao_mercadinho_joao_db_data

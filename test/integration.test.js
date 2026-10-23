@@ -806,3 +806,55 @@ test('importação: planilha .xlsx é lida e as colunas são reconhecidas pelo c
   assert.equal(list.body[0].currentStock, 7);
   assert.equal(list.body[0].expiryDate.slice(0, 10), '2027-05-20', 'a data do Excel (número de série) precisa virar a mesma data no banco');
 });
+
+// ---------- Exportação de Relatórios e Movimentações ----------
+
+test('exportação: administrador consegue exportar relatórios e movimentações em CSV e XLSX', async () => {
+  const endpoints = [
+    '/api/reports/forecast/export?format=csv',
+    '/api/reports/forecast/export?format=xlsx',
+    '/api/reports/sales-summary/export?format=csv',
+    '/api/reports/sales-summary/export?format=xlsx',
+    '/api/reports/top-products/export?format=csv',
+    '/api/reports/top-products/export?format=xlsx',
+    '/api/reports/slow-moving/export?format=csv',
+    '/api/reports/slow-moving/export?format=xlsx',
+    '/api/stock/movements/export?format=csv',
+    '/api/stock/movements/export?format=xlsx',
+  ];
+
+  for (const ep of endpoints) {
+    const res = await fetch(`${baseUrl}${ep}`, {
+      headers: { Cookie: adminJar.header() },
+    });
+    assert.equal(res.status, 200, `endpoint ${ep} deveria retornar 200`);
+    const contentType = res.headers.get('content-type');
+    assert.ok(contentType, `endpoint ${ep} deve ter content-type`);
+    const disposition = res.headers.get('content-disposition');
+    assert.match(disposition, /attachment; filename="/, `endpoint ${ep} deve ter content-disposition de anexo`);
+  }
+});
+
+test('exportação: caixa é bloqueado (403) em todas as rotas de exportação', async () => {
+  const cashierJar = makeCookieJar();
+  await request(baseUrl, cashierJar, '/api/auth/login', {
+    method: 'POST',
+    body: { email: 'caixa.auth@example.com', password: 'SenhaCaixa123!' },
+  });
+
+  const endpoints = [
+    '/api/reports/forecast/export',
+    '/api/reports/sales-summary/export',
+    '/api/reports/top-products/export',
+    '/api/reports/slow-moving/export',
+    '/api/stock/movements/export',
+  ];
+
+  for (const ep of endpoints) {
+    const res = await fetch(`${baseUrl}${ep}`, {
+      headers: { Cookie: cashierJar.header() },
+    });
+    assert.equal(res.status, 403, `caixa deveria ser bloqueado em ${ep}`);
+  }
+});
+
