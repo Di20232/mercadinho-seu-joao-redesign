@@ -19,6 +19,7 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas de login. Tente novamente em alguns minutos.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 // Limites dedicados e mais apertados nos endpoints públicos de auto-cadastro
@@ -32,6 +33,7 @@ const registerLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas de cadastro. Tente novamente mais tarde.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 const forgotLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -39,6 +41,7 @@ const forgotLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas solicitações. Tente novamente em alguns minutos.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 const resetLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -46,6 +49,7 @@ const resetLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 const autoLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -53,6 +57,7 @@ const autoLoginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas de auto-login. Tente novamente em alguns minutos.' },
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 // `login` aceita o e-mail ou o nome de usuário (ex: diego1239). O campo antigo

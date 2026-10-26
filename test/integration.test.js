@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 // Testes de integração de regressão: rodam contra um PostgreSQL real (não
 // mocks) e sobem a aplicação de verdade na memória, exatamente como ela
 // roda em produção. Protegem especificamente contra os bugs mais graves
@@ -836,11 +837,18 @@ test('exportação: administrador consegue exportar relatórios e movimentaçõe
 });
 
 test('exportação: caixa é bloqueado (403) em todas as rotas de exportação', async () => {
-  const cashierJar = makeCookieJar();
-  await request(baseUrl, cashierJar, '/api/auth/login', {
+  const created = await request(baseUrl, adminJar, '/api/users', {
     method: 'POST',
-    body: { email: 'caixa.auth@example.com', password: 'SenhaCaixa123!' },
+    body: { name: 'Caixa Exportação', email: 'caixa.export@example.com', password: 'SenhaCaixa123!', role: 'CASHIER' },
   });
+  assert.equal(created.status, 201);
+
+  const cashierJar = makeCookieJar();
+  const loginRes = await request(baseUrl, cashierJar, '/api/auth/login', {
+    method: 'POST',
+    body: { email: 'caixa.export@example.com', password: 'SenhaCaixa123!' },
+  });
+  assert.equal(loginRes.status, 200, `login do caixa falhou: ${JSON.stringify(loginRes.body)}`);
 
   const endpoints = [
     '/api/reports/forecast/export',
