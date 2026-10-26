@@ -580,7 +580,8 @@ async function loadRecentSales() {
       cells.push(el('td', { class: 'td-actions' }, el('button', {
         class: 'small ghost', type: 'button',
         onclick: async () => {
-          if (!confirm('Cancelar esta venda? O estoque dos itens será devolvido.')) return;
+          const ok = await confirmDialog({ title: 'Cancelar esta venda?', text: `Venda de ${formatMoney(s.totalAmount)} feita por ${s.seller}. O estoque dos itens será devolvido.`, confirmLabel: 'Cancelar venda', cancelLabel: 'Manter', tone: 'danger', iconName: 'receipt' });
+          if (!ok) return;
           try {
             await api.post(`/sales/${s.id}/cancel`);
             toast('Venda cancelada e estoque devolvido.', 'info');
@@ -600,17 +601,33 @@ async function loadRecentSales() {
 }
 
 // ---------- Produtos ----------
+let productFilter = 'all';
+
 async function renderProdutos() {
   activeTemplate('produtos');
   productsPage = 1;
-  await loadProducts();
+  productFilter = 'all';
 
   document.getElementById('product-search').addEventListener('input', debounce(() => {
     productsPage = 1;
     loadProducts();
   }, 250));
+  document.getElementById('product-filter').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-filter]');
+    if (!btn) return;
+    productFilter = btn.dataset.filter;
+    setSegmented('product-filter', btn);
+    productsPage = 1;
+    loadProducts();
+  });
   const newBtn = document.getElementById('new-product-btn');
   if (newBtn) newBtn.addEventListener('click', () => openProductForm(null));
+
+  await loadProducts();
+}
+
+function setSegmented(groupId, activeBtn) {
+  document.querySelectorAll(`#${groupId} button`).forEach((b) => b.classList.toggle('active', b === activeBtn));
 }
 
 function renderPager(containerId, { page, pageSize, totalCount }, onPage) {
@@ -618,7 +635,7 @@ function renderPager(containerId, { page, pageSize, totalCount }, onPage) {
   if (!box) return;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   box.innerHTML = '';
-  if (totalCount === 0) {
+  if (totalCount <= pageSize) {
     box.hidden = true;
     return;
   }
@@ -631,57 +648,94 @@ function renderPager(containerId, { page, pageSize, totalCount }, onPage) {
     type: 'button',
     class: 'small secondary',
     onclick: () => { if (page > 1) onPage(page - 1); },
-  }, 'Anterior');
+  }, [icon('chevron-left'), 'Anterior']);
   prev.disabled = page <= 1;
   const next = el('button', {
     type: 'button',
     class: 'small secondary',
     onclick: () => { if (page < totalPages) onPage(page + 1); },
-  }, 'Próxima');
+  }, ['Próxima', icon('chevron-right')]);
   next.disabled = page >= totalPages;
   actions.appendChild(prev);
   actions.appendChild(next);
   box.appendChild(actions);
 }
 
+function expiryBadge(value) {
+  if (!value) return el('span', { class: 'muted' }, '—');
+  const days = daysFromToday(value);
+  if (days < 0) return el('span', { class: 'badge bad', title: 'Produto vencido' }, formatDate(value));
+  if (days <= 7) return el('span', { class: 'badge warn', title: `Vence em ${days} dia(s)` }, formatDate(value));
+  return el('span', {}, formatDate(value));
+}
+
 async function loadProducts() {
-  const term = document.getElementById('product-search')?.value.trim() || '';
-  const includeInactive = currentUser.role === 'ADMIN' ? '&includeInactive=true' : '';
-  const data = await api.get(`/products?query=${encodeURIComponent(term)}${includeInactive}&page=${productsPage}&pageSize=${LIST_PAGE_SIZE}`);
-  const products = data.products;
   const body = document.getElementById('products-list');
+  if (!body) return;
+  const isAdmin = currentUser.role === 'ADMIN';
+  if (!body.children.length) skeletonRows(body, isAdmin ? 8 : 7, 6);
+
+  const term = document.getElementById('product-search')?.value.trim() || '';
+  const params = new URLSearchParams({ query: term, page: String(productsPage), pageSize: String(LIST_PAGE_SIZE) });
+  if (isAdmin) params.set('includeInactive', 'true');
+  if (productFilter === 'low') params.set('lowStock', 'true');
+  const data = await api.get(`/products?${params.toString()}`);
+  if (!document.body.contains(body)) return;
+
+  const caption = document.getElementById('products-caption');
+  if (caption) caption.textContent = productFilter === 'low' ? `${data.totalCount} produto(s) abaixo do mínimo` : `${data.totalCount} produto(s) cadastrados`;
+
   body.innerHTML = '';
-
-  products.forEach((p) => {
-    const stockBadge = p.currentStock <= p.minStock
-      ? el('span', { class: 'badge bad' }, `${p.currentStock} ${p.unit}`)
-      : el('span', {}, `${p.currentStock} ${p.unit}`);
-
+  data.products.forEach((p) => {
+    const low = p.currentStock <= p.minStock;
     const cells = [
-      el('td', {}, p.name + (p.active ? '' : ' (inativo)')),
-      el('td', {}, p.category || '—'),
-      el('td', {}, stockBadge),
-      el('td', {}, String(p.minStock)),
-      el('td', {}, formatMoney(p.salePrice)),
+      el('td', {}, el('div', { class: 'cell-main' }, [
+        el('span', { class: `cell-avatar${p.active ? '' : ' is-muted'}` }, p.name.trim().charAt(0).toUpperCase()),
+        el('span', {}, [
+          el('span', { class: 'cell-title' }, p.name),
+          el('span', { class: 'cell-sub' }, p.active ? (p.barcode ? `Cód. ${p.barcode}` : `Unidade: ${p.unit}`) : 'Inativo'),
+        ]),
+      ])),
+      el('td', {}, p.category ? el('span', { class: 'badge' }, p.category) : el('span', { class: 'muted' }, '—')),
+      el('td', {}, el('span', { class: `badge ${low ? 'bad' : 'ok'}` }, `${formatQuantity(p.currentStock)} ${p.unit}`)),
+      el('td', { class: 'num' }, formatQuantity(p.minStock)),
+      el('td', { class: 'num' }, el('strong', {}, formatMoney(p.salePrice))),
     ];
-    const costCell = el('td', {}, currentUser.role === 'ADMIN' ? formatMoney(p.costPrice) : '');
+    const costCell = el('td', { class: 'num' }, isAdmin ? formatMoney(p.costPrice) : '');
     costCell.setAttribute('data-admin-only', '');
     cells.push(costCell);
-    cells.push(el('td', {}, formatDate(p.expiryDate)));
-
-    if (currentUser.role === 'ADMIN') {
-      cells.push(el('td', {}, el('button', { class: 'small secondary', type: 'button', onclick: () => openProductForm(p) }, 'Editar')));
-    } else {
-      cells.push(el('td', {}));
-    }
-    body.appendChild(el('tr', {}, cells));
+    cells.push(el('td', {}, expiryBadge(p.expiryDate)));
+    cells.push(el('td', { class: 'td-actions' }, isAdmin
+      ? el('button', { class: 'icon-btn', type: 'button', title: 'Editar produto', 'aria-label': `Editar ${p.name}`, onclick: () => openProductForm(p) }, icon('pencil'))
+      : null));
+    body.appendChild(el('tr', { class: p.active ? '' : 'is-inactive' }, cells));
   });
 
-  if (products.length === 0) body.appendChild(el('tr', {}, el('td', { colspan: '8', class: 'muted' }, 'Nenhum produto encontrado.')));
+  if (data.products.length === 0) {
+    body.appendChild(emptyRow(8, term ? `Nenhum produto encontrado para "${term}".` : 'Nenhum produto por aqui.'));
+  }
+  revealRows(body);
   renderPager('products-pager', data, (nextPage) => {
     productsPage = nextPage;
     loadProducts();
   });
+}
+
+function updateMarginPreview() {
+  const box = document.getElementById('p-margin');
+  if (!box) return;
+  const sale = parseFloat(document.getElementById('p-sale-price').value);
+  const cost = parseFloat(document.getElementById('p-cost-price').value);
+  const valueNode = box.querySelector('strong');
+  box.classList.remove('is-good', 'is-bad');
+  if (!Number.isFinite(sale) || !Number.isFinite(cost) || sale <= 0) {
+    valueNode.textContent = '—';
+    return;
+  }
+  const margin = sale - cost;
+  const pct = (margin / sale) * 100;
+  valueNode.textContent = `${formatMoney(margin)} (${pct.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%)`;
+  box.classList.add(margin > 0 ? 'is-good' : 'is-bad');
 }
 
 function openProductForm(product) {
@@ -689,8 +743,17 @@ function openProductForm(product) {
 
   const isEdit = Boolean(product);
   document.getElementById('product-form-title').textContent = isEdit ? 'Editar produto' : 'Novo produto';
-  document.getElementById('p-initial-stock-label').style.display = isEdit ? 'none' : '';
-  document.getElementById('p-initial-stock').style.display = isEdit ? 'none' : '';
+  document.getElementById('product-form-sub').textContent = isEdit
+    ? 'Mudanças de estoque são feitas na tela Estoque.'
+    : 'Preencha os dados do produto.';
+  document.getElementById('p-initial-stock-field').hidden = isEdit;
+
+  // Sugere as categorias já usadas, para não nascer "Mercearia" e "mercearia".
+  api.get('/products').then((all) => {
+    const list = document.getElementById('p-category-list');
+    if (!list) return;
+    [...new Set(all.map((p) => p.category).filter(Boolean))].sort().forEach((c) => list.appendChild(el('option', { value: c })));
+  }).catch(() => {});
 
   if (isEdit) {
     document.getElementById('p-id').value = product.id;
@@ -709,9 +772,17 @@ function openProductForm(product) {
       deleteBtn.classList.add('danger');
       deleteBtn.classList.remove('secondary');
       deleteBtn.addEventListener('click', async () => {
-        if (!confirm(`Desativar "${product.name}"? Ele deixará de aparecer em vendas novas.`)) return;
+        const ok = await confirmDialog({
+          title: `Desativar "${product.name}"?`,
+          text: 'Ele deixa de aparecer em vendas novas. O histórico continua guardado e dá para reativar depois.',
+          confirmLabel: 'Desativar',
+          tone: 'danger',
+          iconName: 'package-x',
+        });
+        if (!ok) return;
         await api.del(`/products/${product.id}`);
         closeModal(modal);
+        toast(`"${product.name}" foi desativado.`, 'info');
         await loadProducts();
       });
     } else {
@@ -723,16 +794,25 @@ function openProductForm(product) {
       deleteBtn.addEventListener('click', async () => {
         await api.put(`/products/${product.id}`, { active: true });
         closeModal(modal);
+        toast(`"${product.name}" voltou a ficar ativo.`);
         await loadProducts();
       });
     }
   }
 
+  document.getElementById('p-sale-price').addEventListener('input', updateMarginPreview);
+  document.getElementById('p-cost-price').addEventListener('input', updateMarginPreview);
+  updateMarginPreview();
+
   document.getElementById('product-cancel-btn').addEventListener('click', () => closeModal(modal));
+  document.getElementById('product-close-btn').addEventListener('click', () => closeModal(modal));
 
   document.getElementById('product-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const form = e.target;
+    if (!form.checkValidity()) { form.reportValidity(); return; }
     const msg = document.getElementById('product-form-msg');
+    const saveBtn = document.getElementById('product-save-btn');
     msg.hidden = true;
     const payload = {
       name: document.getElementById('p-name').value,
@@ -746,12 +826,15 @@ function openProductForm(product) {
     };
     if (!isEdit) payload.initialStock = parseFloat(document.getElementById('p-initial-stock').value || '0');
 
+    setButtonLoading(saveBtn, true);
     try {
       if (isEdit) await api.put(`/products/${product.id}`, payload);
       else await api.post('/products', payload);
       closeModal(modal);
+      toast(isEdit ? 'Produto atualizado.' : `"${payload.name}" cadastrado.`);
       await loadProducts();
     } catch (err) {
+      setButtonLoading(saveBtn, false);
       msg.textContent = err.message;
       msg.hidden = false;
     }
@@ -759,75 +842,134 @@ function openProductForm(product) {
 }
 
 // ---------- Estoque ----------
+const MOVEMENT_TYPES = {
+  ENTRY: { label: 'Entrada', badge: 'ok', icon: 'arrow-down-to-line' },
+  SALE: { label: 'Venda', badge: 'info', icon: 'shopping-cart' },
+  LOSS: { label: 'Perda', badge: 'bad', icon: 'package-x' },
+  ADJUSTMENT: { label: 'Ajuste', badge: 'warn', icon: 'pencil' },
+};
+let movementType = '';
+let stockProducts = [];
+
 async function renderEstoque() {
   activeTemplate('estoque');
   movementsPage = 1;
-  const products = await api.get('/products');
+  movementType = '';
 
   const entrySelect = document.getElementById('entry-product');
   const adjSelect = document.getElementById('adjustment-product');
-  products.forEach((p) => {
-    entrySelect.appendChild(el('option', { value: p.id }, `${p.name} (${p.currentStock} ${p.unit})`));
-    adjSelect.appendChild(el('option', { value: p.id }, `${p.name} (${p.currentStock} ${p.unit})`));
+
+  const fillSelects = async () => {
+    stockProducts = await api.get('/products');
+    [entrySelect, adjSelect].forEach((select) => {
+      const keep = select.value;
+      select.innerHTML = '';
+      select.appendChild(el('option', { value: '' }, 'Escolha o produto…'));
+      stockProducts.forEach((p) => select.appendChild(el('option', { value: p.id }, p.name)));
+      select.value = keep;
+    });
+    updateStockHint('entry', 1);
+    updateStockHint('adjustment', -1);
+  };
+
+  // Mostra o saldo atual e como fica depois do lançamento, antes de gravar.
+  const bindHint = (prefix, sign) => {
+    document.getElementById(`${prefix}-product`).addEventListener('change', () => updateStockHint(prefix, sign));
+    document.getElementById(`${prefix}-qty`).addEventListener('input', () => updateStockHint(prefix, sign));
+  };
+  bindHint('entry', 1);
+  bindHint('adjustment', -1);
+
+  const submitMovement = async (formId, prefix, send, successText) => {
+    const form = document.getElementById(formId);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      const msg = document.getElementById(`${prefix}-msg`);
+      const btn = document.getElementById(`${prefix}-submit`);
+      msg.hidden = true;
+      setButtonLoading(btn, true);
+      try {
+        const product = stockProducts.find((p) => p.id === document.getElementById(`${prefix}-product`).value);
+        await send();
+        form.reset();
+        toast(successText(product));
+        movementsPage = 1;
+        await Promise.all([fillSelects(), loadMovements()]);
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.hidden = false;
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    });
+  };
+
+  submitMovement('entry-form', 'entry', () => api.post('/stock/entries', {
+    productId: entrySelect.value,
+    quantity: parseFloat(document.getElementById('entry-qty').value),
+    reason: document.getElementById('entry-reason').value || undefined,
+  }), (p) => `Entrada registrada${p ? ` em "${p.name}"` : ''}.`);
+
+  submitMovement('adjustment-form', 'adjustment', () => api.post('/stock/adjustments', {
+    productId: adjSelect.value,
+    quantity: -Math.abs(parseFloat(document.getElementById('adjustment-qty').value)),
+    reason: document.getElementById('adjustment-reason').value,
+    type: 'LOSS',
+  }), (p) => `Perda registrada${p ? ` em "${p.name}"` : ''}.`);
+
+  document.getElementById('movement-filter').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-type]');
+    if (!btn) return;
+    movementType = btn.dataset.type;
+    setSegmented('movement-filter', btn);
+    document.getElementById('movements-export').href = `/api/stock/movements/export?format=xlsx${movementType ? `&type=${movementType}` : ''}`;
+    movementsPage = 1;
+    loadMovements();
   });
 
-  document.getElementById('entry-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById('entry-msg');
-    msg.hidden = true;
-    try {
-      await api.post('/stock/entries', {
-        productId: entrySelect.value,
-        quantity: parseFloat(document.getElementById('entry-qty').value),
-        reason: document.getElementById('entry-reason').value || undefined,
-      });
-      document.getElementById('entry-form').reset();
-      await renderEstoque();
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.hidden = false;
-    }
-  });
+  await Promise.all([fillSelects(), loadMovements()]);
+}
 
-  document.getElementById('adjustment-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById('adjustment-msg');
-    msg.hidden = true;
-    try {
-      await api.post('/stock/adjustments', {
-        productId: adjSelect.value,
-        quantity: -Math.abs(parseFloat(document.getElementById('adjustment-qty').value)),
-        reason: document.getElementById('adjustment-reason').value,
-        type: 'LOSS',
-      });
-      document.getElementById('adjustment-form').reset();
-      await renderEstoque();
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.hidden = false;
-    }
-  });
-
-  await loadMovements();
+function updateStockHint(prefix, sign) {
+  const hint = document.getElementById(`${prefix}-hint`);
+  if (!hint) return;
+  hint.innerHTML = '';
+  const product = stockProducts.find((p) => p.id === document.getElementById(`${prefix}-product`).value);
+  if (!product) return;
+  const qty = parseFloat(document.getElementById(`${prefix}-qty`).value);
+  hint.appendChild(document.createTextNode('Em estoque: '));
+  hint.appendChild(el('strong', {}, `${formatQuantity(product.currentStock)} ${product.unit}`));
+  if (Number.isFinite(qty) && qty > 0) {
+    const next = product.currentStock + sign * qty;
+    hint.appendChild(el('span', { class: 'stock-arrow' }, icon('arrow-right')));
+    hint.appendChild(el('strong', { class: `is-next${next < 0 ? ' neg' : ''}` }, `${formatQuantity(next)} ${product.unit}`));
+  }
 }
 
 async function loadMovements() {
-  const data = await api.get(`/stock/movements?page=${movementsPage}&pageSize=${LIST_PAGE_SIZE}`);
   const body = document.getElementById('movements-list');
   if (!body) return;
+  if (!body.children.length) skeletonRows(body, 7, 6);
+  const typeParam = movementType ? `&type=${movementType}` : '';
+  const data = await api.get(`/stock/movements?page=${movementsPage}&pageSize=${LIST_PAGE_SIZE}${typeParam}`);
+  if (!document.body.contains(body)) return;
   body.innerHTML = '';
   data.movements.forEach((m) => {
+    const type = MOVEMENT_TYPES[m.type] || { label: m.type, badge: '', icon: 'info' };
+    const delta = m.newStock - m.previousStock;
     body.appendChild(el('tr', {}, [
-      el('td', {}, formatDateTime(m.createdAt)),
-      el('td', {}, m.product),
-      el('td', {}, m.type),
-      el('td', {}, String(m.quantity)),
-      el('td', {}, String(m.newStock)),
-      el('td', {}, m.reason || '—'),
+      el('td', { class: 'num' }, formatDateTime(m.createdAt)),
+      el('td', {}, el('span', { class: 'cell-title' }, m.product)),
+      el('td', {}, el('span', { class: `badge ${type.badge}` }, type.label)),
+      el('td', { class: `num ${delta >= 0 ? 'qty-pos' : 'qty-neg'}` }, `${delta >= 0 ? '+' : '−'}${formatQuantity(Math.abs(delta))}`),
+      el('td', { class: 'stock-flow' }, [formatQuantity(m.previousStock), ' → ', el('strong', {}, formatQuantity(m.newStock))]),
+      el('td', {}, m.reason || el('span', { class: 'muted' }, '—')),
       el('td', {}, m.user),
     ]));
   });
-  if (data.movements.length === 0) body.appendChild(el('tr', {}, el('td', { colspan: '7', class: 'muted' }, 'Nenhuma movimentação registrada.')));
+  if (data.movements.length === 0) body.appendChild(emptyRow(7, 'Nenhuma movimentação registrada.'));
+  revealRows(body);
   renderPager('movements-pager', data, (nextPage) => {
     movementsPage = nextPage;
     loadMovements();
@@ -843,14 +985,48 @@ let importState = null;
 const IMPORT_STEPS = ['source', 'mapping', 'preview', 'result'];
 
 function showImportStep(step) {
+  const current = IMPORT_STEPS.indexOf(step);
   IMPORT_STEPS.forEach((name) => {
     document.getElementById(`imp-step-${name}`).hidden = name !== step;
   });
+  document.querySelectorAll('#imp-steps .step').forEach((node) => {
+    const index = IMPORT_STEPS.indexOf(node.dataset.step);
+    // A última etapa já nasce "feita": chegar nela é a conclusão.
+    node.classList.toggle('is-done', index < current || (step === 'result' && index === current));
+    node.classList.toggle('is-current', index === current && step !== 'result');
+  });
+  document.querySelectorAll('#imp-steps .step-line').forEach((line, i) => line.classList.toggle('is-done', i < current));
+  window.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+}
+
+function setImportFile(file) {
+  const zone = document.getElementById('imp-dropzone');
+  const name = document.getElementById('imp-file-name');
+  const hint = document.getElementById('imp-file-hint');
+  zone.classList.toggle('has-file', Boolean(file));
+  name.textContent = file ? file.name : 'Arraste a planilha para cá';
+  hint.textContent = file ? `${(file.size / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} KB · clique para trocar` : 'ou clique para escolher o arquivo';
 }
 
 async function renderImportar() {
   activeTemplate('importar');
   importState = null;
+  showImportStep('source');
+
+  const fileInput = document.getElementById('imp-file');
+  const zone = document.getElementById('imp-dropzone');
+  fileInput.addEventListener('change', () => setImportFile(fileInput.files[0]));
+  ['dragenter', 'dragover'].forEach((evt) => zone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    zone.classList.add('is-over');
+  }));
+  ['dragleave', 'drop'].forEach((evt) => zone.addEventListener(evt, () => zone.classList.remove('is-over')));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length === 0) return;
+    fileInput.files = e.dataTransfer.files;
+    setImportFile(fileInput.files[0]);
+  });
 
   document.getElementById('imp-read-btn').addEventListener('click', readSpreadsheet);
   document.getElementById('imp-back-btn').addEventListener('click', () => showImportStep('source'));
@@ -873,7 +1049,7 @@ async function readSpreadsheet() {
     return;
   }
 
-  btn.disabled = true;
+  setButtonLoading(btn, true);
   try {
     let body;
     if (file) {
@@ -889,7 +1065,7 @@ async function readSpreadsheet() {
     msg.textContent = err.message;
     msg.hidden = false;
   } finally {
-    btn.disabled = false;
+    setButtonLoading(btn, false);
   }
 }
 
@@ -909,7 +1085,7 @@ function renderColumnMapping() {
   const grid = document.getElementById('imp-map-grid');
   grid.innerHTML = '';
 
-  fields.forEach((field) => {
+  fields.forEach((field, i) => {
     const selectId = `imp-map-${field.key}`;
     const sample = el('span', { class: 'map-sample' });
     const select = el('select', {
@@ -921,11 +1097,13 @@ function renderColumnMapping() {
     select.value = mapping[field.key] === undefined ? '' : String(mapping[field.key]);
     sample.textContent = columnSample(select.value);
 
-    grid.appendChild(el('div', {}, [
+    const cell = el('div', { class: 'reveal' }, [
       el('label', { for: selectId }, field.required ? `${field.label} (obrigatório)` : field.label),
       select,
       sample,
-    ]));
+    ]);
+    cell.style.setProperty('--i', String(i));
+    grid.appendChild(cell);
   });
 }
 
@@ -952,19 +1130,20 @@ async function previewImport() {
   const msg = document.getElementById('imp-map-msg');
   const btn = document.getElementById('imp-preview-btn');
   msg.hidden = true;
-  btn.disabled = true;
+  setButtonLoading(btn, true);
 
   try {
     // O mesmo payload conferido aqui é o que vai para a gravação — assim o
     // que o usuário aprovou na tela é literalmente o que o servidor executa.
     importState.payload = buildImportPayload();
-    renderImportPlan(await api.post('/imports/products/preview', importState.payload));
+    importState.plan = await api.post('/imports/products/preview', importState.payload);
     showImportStep('preview');
+    renderImportPlan(importState.plan);
   } catch (err) {
     msg.textContent = err.message;
     msg.hidden = false;
   } finally {
-    btn.disabled = false;
+    setButtonLoading(btn, false);
   }
 }
 
@@ -983,15 +1162,19 @@ function renderImportPlan(plan) {
   const summary = document.getElementById('imp-summary');
   summary.innerHTML = '';
   [
-    ['Novos', plan.summary.create],
-    ['Atualizações', plan.summary.update],
-    ['Ignorados', plan.summary.skip],
-    ['Com erro', plan.summary.error],
-  ].forEach(([label, value]) => {
-    summary.appendChild(el('div', { class: 'card stat' }, [
-      el('span', { class: 'stat-label' }, label),
-      el('span', { class: 'stat-value' }, String(value)),
-    ]));
+    ['Novos', plan.summary.create, 'plus', ''],
+    ['Atualizações', plan.summary.update, 'pencil', 'accent'],
+    ['Ignorados', plan.summary.skip, 'minus', 'muted'],
+    ['Com erro', plan.summary.error, 'circle-alert', 'danger'],
+  ].forEach(([label, value, iconName, tone], i) => {
+    const number = el('strong', {}, '0');
+    const card = el('div', { class: 'stat-card', 'data-tone': tone || null }, [
+      el('span', { class: 'kpi-icon' }, icon(iconName)),
+      el('div', {}, [number, el('span', { class: 'stat-name' }, label)]),
+    ]);
+    card.style.setProperty('--i', String(i));
+    summary.appendChild(card);
+    animateValue(number, value);
   });
 
   // Toda linha com erro ou aviso aparece — são as que exigem decisão. As
@@ -1021,19 +1204,20 @@ function renderImportPlan(plan) {
     else if (item.stockDelta) stock = `${formatQuantity(item.before.currentStock)} → ${formatQuantity(item.resultingStock)}`;
 
     body.appendChild(el('tr', { class: item.action === 'error' ? 'row-error' : (item.action === 'skip' ? 'row-skip' : '') }, [
-      el('td', {}, String(item.line)),
+      el('td', { class: 'num' }, String(item.line)),
       el('td', {}, el('span', { class: `badge ${action.badge}` }, action.label)),
       el('td', {}, item.values.name || '—'),
-      el('td', {}, price),
-      el('td', {}, stock),
+      el('td', { class: 'num' }, price),
+      el('td', { class: 'num' }, stock),
       el('td', {}, notes.childElementCount > 0 ? notes : el('span', { class: 'muted' }, '—')),
     ]));
   });
 
   const omitted = plan.items.length - shown.length;
   if (omitted > 0) {
-    body.appendChild(el('tr', {}, el('td', { colspan: '6', class: 'muted' }, `+ ${omitted} linha(s) sem observações não listadas aqui.`)));
+    body.appendChild(emptyRow(6, `+ ${omitted} linha(s) sem observações não listadas aqui.`));
   }
+  revealRows(body);
 
   document.getElementById('imp-commit-btn').disabled = plan.summary.create + plan.summary.update === 0;
 }
@@ -1043,9 +1227,17 @@ async function commitImport() {
   const btn = document.getElementById('imp-commit-btn');
   msg.hidden = true;
 
-  if (!confirm('Confirmar a importação? Os produtos serão cadastrados e atualizados conforme a conferência acima.')) return;
+  const { create, update } = importState.plan.summary;
+  const ok = await confirmDialog({
+    title: 'Confirmar a importação?',
+    text: `${create} produto(s) serão cadastrados e ${update} atualizados, conforme a conferência.`,
+    confirmLabel: 'Importar agora',
+    tone: 'ok',
+    iconName: 'file-up',
+  });
+  if (!ok) return;
 
-  btn.disabled = true;
+  setButtonLoading(btn, true);
   try {
     const result = await api.post('/imports/products/commit', importState.payload);
     document.getElementById('imp-result-text').textContent =
@@ -1056,7 +1248,7 @@ async function commitImport() {
     failuresBody.innerHTML = '';
     result.failures.forEach((failure) => {
       failuresBody.appendChild(el('tr', {}, [
-        el('td', {}, String(failure.line)),
+        el('td', { class: 'num' }, String(failure.line)),
         el('td', {}, failure.name || '—'),
         el('td', {}, failure.error),
       ]));
@@ -1064,70 +1256,173 @@ async function commitImport() {
     failuresBox.hidden = result.failures.length === 0;
 
     showImportStep('result');
+    toast('Importação concluída.');
   } catch (err) {
     msg.textContent = err.message;
     msg.hidden = false;
   } finally {
-    btn.disabled = false;
+    setButtonLoading(btn, false);
   }
 }
 
 // ---------- Relatórios ----------
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function applyReportPreset(preset) {
+  const today = new Date();
+  let from = '';
+  let to = localDateKey(today);
+  if (preset === 'today') from = to;
+  else if (preset === '7' || preset === '30') from = localDateKey(new Date(Date.now() - (Number(preset) - 1) * 86400000));
+  else if (preset === 'month') from = localDateKey(new Date(today.getFullYear(), today.getMonth(), 1));
+  else { from = ''; to = ''; }
+  document.getElementById('rep-from').value = from;
+  document.getElementById('rep-to').value = to;
+}
+
 async function renderRelatorios() {
   activeTemplate('relatorios');
+  applyReportPreset('30');
+
+  document.getElementById('rep-presets').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-preset]');
+    if (!btn) return;
+    setSegmented('rep-presets', btn);
+    applyReportPreset(btn.dataset.preset);
+    loadReports();
+  });
+  ['rep-from', 'rep-to'].forEach((id) => document.getElementById(id).addEventListener('change', () => setSegmented('rep-presets', null)));
   document.getElementById('rep-apply-btn').addEventListener('click', loadReports);
   await loadReports();
 }
 
-async function loadReports() {
-  try {
-    const from = document.getElementById('rep-from').value;
-    const to = document.getElementById('rep-to').value;
-    const qs = new URLSearchParams();
-    if (from) qs.set('from', from);
-    if (to) qs.set('to', to);
+// Dias do período, inclusive os sem venda (que entram como zero no gráfico).
+function reportDays(from, to, byDay) {
+  const keys = Object.keys(byDay).sort();
+  const start = from || keys[0];
+  const end = to || keys[keys.length - 1];
+  if (!start || !end) return [];
+  const days = [];
+  for (let t = Date.parse(`${start}T00:00:00Z`); t <= Date.parse(`${end}T00:00:00Z`) && days.length < 400; t += 86400000) {
+    days.push(new Date(t).toISOString().slice(0, 10));
+  }
+  return days;
+}
 
-    const [summary, topProducts, slowMoving] = await Promise.all([
+function formatDayKey(key, options = { day: '2-digit', month: '2-digit' }) {
+  return new Date(`${key}T12:00:00Z`).toLocaleDateString('pt-BR', options);
+}
+
+async function loadReports() {
+  const from = document.getElementById('rep-from').value;
+  const to = document.getElementById('rep-to').value;
+  const qs = new URLSearchParams();
+  if (from) qs.set('from', from);
+  if (to) qs.set('to', to);
+
+  document.getElementById('rep-export-summary').href = `/api/reports/sales-summary/export?${qs.toString()}&format=xlsx`;
+  document.getElementById('rep-export-top').href = `/api/reports/top-products/export?${qs.toString()}&format=xlsx`;
+  skeletonRows(document.getElementById('rep-top-products'), 4, 5);
+  skeletonRows(document.getElementById('rep-by-day'), 2, 5);
+
+  let summary;
+  let topProducts;
+  let slowMoving;
+  try {
+    [summary, topProducts, slowMoving] = await Promise.all([
       api.get(`/reports/sales-summary?${qs.toString()}`),
       api.get(`/reports/top-products?${qs.toString()}`),
       api.get('/reports/slow-moving'),
     ]);
-
-    document.getElementById('rep-total').textContent = formatMoney(summary.total);
-    document.getElementById('rep-count').textContent = String(summary.count);
-
-    const byDayBody = document.getElementById('rep-by-day');
-    byDayBody.innerHTML = '';
-    Object.entries(summary.byDay).sort().reverse().forEach(([day, total]) => {
-      byDayBody.appendChild(el('tr', {}, [el('td', {}, day), el('td', {}, formatMoney(total))]));
-    });
-    if (Object.keys(summary.byDay).length === 0) byDayBody.appendChild(el('tr', {}, el('td', { colspan: '2', class: 'muted' }, 'Sem vendas no período.')));
-
-    const topBody = document.getElementById('rep-top-products');
-    topBody.innerHTML = '';
-    topProducts.forEach((p) => {
-      topBody.appendChild(el('tr', {}, [el('td', {}, p.name), el('td', {}, String(p.quantitySold)), el('td', {}, formatMoney(p.revenue))]));
-    });
-    if (topProducts.length === 0) topBody.appendChild(el('tr', {}, el('td', { colspan: '3', class: 'muted' }, 'Sem vendas no período.')));
-
-    const slowBody = document.getElementById('rep-slow-moving');
-    slowBody.innerHTML = '';
-    slowMoving.forEach((p) => {
-      slowBody.appendChild(el('tr', {}, [el('td', {}, p.name), el('td', {}, String(p.currentStock)), el('td', {}, formatMoney(p.capitalParado))]));
-    });
-    if (slowMoving.length === 0) slowBody.appendChild(el('tr', {}, el('td', { colspan: '3', class: 'muted' }, 'Nenhum produto parado.')));
   } catch (err) {
     console.error('Erro ao carregar relatórios:', err);
-    // Mostrar erro ao usuário de forma amigável
-    const totalEl = document.getElementById('rep-total');
-    if (totalEl && totalEl.parentElement) {
-      const card = totalEl.closest('.card');
-      if (card) {
-        const errorMsg = el('p', { class: 'error notice' }, `❌ Erro ao carregar relatório: ${err.message}`);
-        card.insertBefore(errorMsg, card.firstChild);
-      }
-    }
+    toast(`Não foi possível carregar o relatório: ${err.message}`, 'error', 6000);
+    return;
   }
+  if (!document.getElementById('rep-kpis')) return;
+
+  // Indicadores
+  const days = reportDays(from, to, summary.byDay);
+  const best = Object.entries(summary.byDay).sort((a, b) => b[1] - a[1])[0];
+  const kpis = [
+    { label: 'Total vendido', iconName: 'trending-up', value: summary.total, format: formatMoney, sub: from || to ? 'no período escolhido' : 'desde o início' },
+    { label: 'Vendas', iconName: 'shopping-cart', tone: 'info', value: summary.count, format: (v) => String(Math.round(v)), sub: `em ${Object.keys(summary.byDay).length} dia(s) com movimento` },
+    { label: 'Ticket médio', iconName: 'receipt', tone: 'accent', value: summary.count ? summary.total / summary.count : 0, format: formatMoney, sub: 'por venda' },
+    { label: 'Melhor dia', iconName: 'sparkles', tone: 'accent', value: best ? best[1] : 0, format: formatMoney, sub: best ? formatDayKey(best[0], { weekday: 'long', day: '2-digit', month: '2-digit' }) : 'sem vendas' },
+  ];
+  const grid = document.getElementById('rep-kpis');
+  grid.innerHTML = '';
+  const built = kpis.map(kpiCard);
+  built.forEach(({ card }) => grid.appendChild(card));
+  stagger(grid.children);
+  built.forEach(({ run }) => run());
+
+  // Gráfico
+  const chartBox = document.getElementById('rep-chart');
+  chartBox.innerHTML = '';
+  document.getElementById('rep-chart-caption').textContent = days.length
+    ? `${formatDayKey(days[0], { day: '2-digit', month: '2-digit', year: 'numeric' })} a ${formatDayKey(days[days.length - 1], { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+    : '';
+  if (summary.count === 0 || days.length === 0) {
+    chartBox.appendChild(emptyState('chart-column', 'Sem vendas no período', 'Escolha outro período acima.'));
+  } else {
+    areaChart(chartBox, days.map((key) => ({
+      label: formatDayKey(key),
+      fullLabel: formatDayKey(key, { weekday: 'short', day: '2-digit', month: '2-digit' }),
+      value: summary.byDay[key] || 0,
+    })));
+  }
+
+  // Resumo por dia
+  animateValue(document.getElementById('rep-total'), summary.total, formatMoney);
+  document.getElementById('rep-count').textContent = String(summary.count);
+  const byDayBody = document.getElementById('rep-by-day');
+  byDayBody.innerHTML = '';
+  Object.entries(summary.byDay).sort().reverse().forEach(([day, total]) => {
+    byDayBody.appendChild(el('tr', {}, [
+      el('td', {}, formatDayKey(day, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })),
+      el('td', { class: 'num' }, el('strong', {}, formatMoney(total))),
+    ]));
+  });
+  if (Object.keys(summary.byDay).length === 0) byDayBody.appendChild(emptyRow(2, 'Sem vendas no período.'));
+  revealRows(byDayBody);
+
+  // Mais vendidos
+  const topBody = document.getElementById('rep-top-products');
+  topBody.innerHTML = '';
+  const maxRevenue = Math.max(...topProducts.map((p) => p.revenue), 0) || 1;
+  topProducts.forEach((p, i) => {
+    const bar = el('span');
+    bar.style.setProperty('--w', `${Math.max(3, (p.revenue / maxRevenue) * 100)}%`);
+    bar.style.setProperty('--i', String(i));
+    topBody.appendChild(el('tr', {}, [
+      el('td', {}, el('span', { class: 'rank' }, String(i + 1))),
+      el('td', {}, [el('span', { class: 'cell-title' }, p.name), el('div', { class: 'inline-bar' }, bar)]),
+      el('td', { class: 'num' }, formatQuantity(p.quantitySold)),
+      el('td', { class: 'num' }, el('strong', {}, formatMoney(p.revenue))),
+    ]));
+  });
+  if (topProducts.length === 0) topBody.appendChild(emptyRow(4, 'Sem vendas no período.'));
+  revealRows(topBody);
+
+  // Capital parado
+  const slowBody = document.getElementById('rep-slow-moving');
+  slowBody.innerHTML = '';
+  slowMoving.forEach((p) => {
+    slowBody.appendChild(el('tr', {}, [
+      el('td', {}, el('span', { class: 'cell-title' }, p.name)),
+      el('td', { class: 'num' }, formatQuantity(p.currentStock)),
+      el('td', { class: 'num' }, el('strong', {}, formatMoney(p.capitalParado))),
+    ]));
+  });
+  if (slowMoving.length === 0) slowBody.appendChild(emptyRow(3, 'Nenhum produto parado. Tudo girando!'));
+  revealRows(slowBody);
+  const slowTotal = slowMoving.reduce((sum, p) => sum + p.capitalParado, 0);
+  const slowChip = document.getElementById('rep-slow-total');
+  slowChip.classList.toggle('has-items', slowMoving.length > 0);
+  animateValue(slowChip, slowTotal, (v) => `${formatMoney(v)} parado`);
 }
 
 // ---------- Usuários ----------
@@ -1138,19 +1433,36 @@ async function renderUsuarios() {
 }
 
 async function loadUsers() {
-  const users = await api.get('/users');
   const body = document.getElementById('users-list');
+  if (!body) return;
+  if (!body.children.length) skeletonRows(body, 6, 4);
+  const users = await api.get('/users');
+  if (!document.body.contains(body)) return;
+  const active = users.filter((u) => u.active).length;
+  document.getElementById('users-caption').textContent = `${users.length} conta(s) · ${active} ativa(s)`;
+
   body.innerHTML = '';
   users.forEach((u) => {
-    body.appendChild(el('tr', {}, [
-      el('td', {}, u.name),
-      el('td', {}, u.username),
+    const isMe = u.id === currentUser.id;
+    body.appendChild(el('tr', { class: u.active ? '' : 'is-inactive' }, [
+      el('td', {}, el('div', { class: 'cell-main' }, [
+        el('span', { class: `cell-avatar round${u.active ? '' : ' is-muted'}` }, u.name.trim().charAt(0).toUpperCase()),
+        el('span', {}, [
+          el('span', { class: 'cell-title' }, u.name),
+          isMe ? el('span', { class: 'cell-sub' }, 'Você') : null,
+        ]),
+      ])),
+      el('td', {}, el('span', { class: 'muted' }, `@${u.username}`)),
       el('td', {}, u.email),
-      el('td', {}, u.role === 'ADMIN' ? 'Administrador' : 'Funcionário'),
-      el('td', {}, u.active ? 'Sim' : 'Não'),
-      el('td', {}, el('button', { class: 'small secondary', type: 'button', onclick: () => openUserForm(u) }, 'Editar')),
+      el('td', {}, el('span', { class: `badge ${u.role === 'ADMIN' ? 'info' : ''}` }, u.role === 'ADMIN' ? 'Administrador' : 'Funcionário')),
+      el('td', {}, el('span', { class: `badge ${u.active ? 'ok' : 'bad'}` }, u.active ? 'Ativo' : 'Inativo')),
+      el('td', { class: 'td-actions' }, el('button', {
+        class: 'icon-btn', type: 'button', title: 'Editar usuário', 'aria-label': `Editar ${u.name}`, onclick: () => openUserForm(u),
+      }, icon('pencil'))),
     ]));
   });
+  if (users.length === 0) body.appendChild(emptyRow(6, 'Nenhum usuário cadastrado.'));
+  revealRows(body);
 }
 
 function openUserForm(user) {
@@ -1158,13 +1470,14 @@ function openUserForm(user) {
   const isEdit = Boolean(user);
 
   document.getElementById('user-form-title').textContent = isEdit ? 'Editar usuário' : 'Novo usuário';
-  document.getElementById('u-email-label').style.display = isEdit ? 'none' : '';
-  document.getElementById('u-email').style.display = isEdit ? 'none' : '';
+  document.getElementById('user-form-sub').textContent = isEdit ? `@${user.username} · ${user.email}` : 'A conta entra como funcionário (caixa).';
+  document.getElementById('u-email-field').hidden = isEdit;
   document.getElementById('u-email').required = !isEdit;
-  document.getElementById('u-active-label').style.display = isEdit ? '' : 'none';
-  document.getElementById('u-active').style.display = isEdit ? '' : 'none';
+  document.getElementById('u-active-label').hidden = !isEdit;
   document.getElementById('u-password-label').textContent = isEdit ? 'Nova senha (deixe em branco para manter)' : 'Senha';
   document.getElementById('u-password').required = !isEdit;
+  bindPasswordToggle(document.getElementById('u-password-toggle'), document.getElementById('u-password'));
+  bindStrengthMeter(document.getElementById('u-password'), document.getElementById('u-strength'), document.getElementById('u-strength-label'));
 
   if (isEdit) {
     document.getElementById('u-id').value = user.id;
@@ -1173,13 +1486,18 @@ function openUserForm(user) {
   }
 
   document.getElementById('user-cancel-btn').addEventListener('click', () => closeModal(modal));
+  document.getElementById('user-close-btn').addEventListener('click', () => closeModal(modal));
 
   document.getElementById('user-form').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const form = e.target;
+    if (!form.checkValidity()) { form.reportValidity(); return; }
     const msg = document.getElementById('user-form-msg');
+    const saveBtn = document.getElementById('user-save-btn');
     msg.hidden = true;
     const password = document.getElementById('u-password').value;
 
+    setButtonLoading(saveBtn, true);
     try {
       if (isEdit) {
         const payload = {
@@ -1196,8 +1514,10 @@ function openUserForm(user) {
         });
       }
       closeModal(modal);
+      toast(isEdit ? 'Usuário atualizado.' : 'Usuário criado.');
       await loadUsers();
     } catch (err) {
+      setButtonLoading(saveBtn, false);
       msg.textContent = err.message;
       msg.hidden = false;
     }

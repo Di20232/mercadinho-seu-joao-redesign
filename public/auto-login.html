@@ -1,26 +1,34 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mercadinho do João — Autenticação</title>
-  <link rel="stylesheet" href="/css/auto-login.css">
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="/js/theme.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>Mercadinho do João</h1>
-    <p class="subtitle">Autenticando automaticamente...</p>
+  <div class="login-wrap">
+    <div class="card login-card view-enter">
+      <div class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-store" /></svg></div>
+      <h1>Mercadinho do João</h1>
+      <p class="muted">Entrando automaticamente…</p>
 
-    <div class="loader"></div>
-    <p class="status" id="status">Conectando ao servidor...</p>
+      <div class="auth-status">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="status" id="status" role="status">Conectando ao servidor...</p>
+      </div>
 
-    <div class="credentials">
-      <p><strong>Modo demonstração:</strong></p>
-      <p>👤 Perfil exigido: <code>Caixa</code></p>
-      <p>🔒 Disponível só com <code>AUTO_LOGIN_ENABLED=true</code> no ambiente local.</p>
+      <div class="auth-note">
+        <p><strong>Modo demonstração</strong></p>
+        <p>Perfil exigido: <code>Caixa</code>. Disponível só com <code>AUTO_LOGIN_ENABLED=true</code> no ambiente local.</p>
+        <a href="/index.html" class="link-action">Entrar com usuário e senha</a>
+      </div>
     </div>
   </div>
 
+  <script src="/js/icons.js"></script>
   <script src="/js/auto-login.js"></script>
 </body>
 </html>

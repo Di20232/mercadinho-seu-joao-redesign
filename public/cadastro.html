@@ -4,37 +4,82 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mercadinho do João — Cadastro</title>
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/style.css" />
+  <script src="/js/theme.js"></script>
 </head>
 <body>
-  <main class="login-wrap">
-    <form id="register-form" class="card login-card">
-      <div class="brand-mark" aria-hidden="true">MJ</div>
-      <h1>Criar conta</h1>
-      <p class="muted">Sua conta será criada como funcionário (caixa) e você já entra no sistema em seguida.</p>
-
-      <label for="name">Nome</label>
-      <input id="name" name="name" type="text" autocomplete="name" required maxlength="120" />
-
-      <label for="email">E-mail</label>
-      <input id="email" name="email" type="email" autocomplete="username" required maxlength="255" />
-
-      <label for="password">Senha</label>
-      <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="200" />
-
-      <label for="confirm">Confirme a senha</label>
-      <input id="confirm" name="confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="200" />
-
-      <button type="submit">Cadastrar</button>
-      <p id="register-msg" class="error" role="alert" hidden></p>
-
-      <div class="login-links">
-        <a href="/index.html" class="link-action">Voltar para o login</a>
+  <div class="auth-shell">
+    <aside class="auth-brand" aria-hidden="true">
+      <div class="auth-grid"></div>
+      <div class="auth-logo">
+        <span class="brand-mark"><svg class="icon"><use href="#i-store" /></svg></span>
+        Mercadinho do João
       </div>
-    </form>
-  </main>
+      <div class="auth-pitch reveal">
+        <h2>Bem-vindo ao <em>time do balcão.</em></h2>
+        <p>Sua conta entra como funcionário (caixa): você registra vendas e consulta produtos e alertas de estoque.</p>
+        <ul class="auth-features">
+          <li class="reveal"><svg class="icon"><use href="#i-user" /></svg>Você ganha um usuário curto para entrar</li>
+          <li class="reveal"><svg class="icon"><use href="#i-lock" /></svg>Senha guardada com criptografia</li>
+          <li class="reveal"><svg class="icon"><use href="#i-key-round" /></svg>O administrador cuida das permissões</li>
+        </ul>
+      </div>
+      <p class="auth-foot">Sistema de vendas e estoque</p>
+    </aside>
+
+    <main class="auth-main">
+      <button id="theme-toggle" class="icon-btn theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <svg class="icon icon-moon"><use href="#i-moon" /></svg>
+        <svg class="icon icon-sun"><use href="#i-sun" /></svg>
+      </button>
+
+      <form id="register-form" class="auth-form view-enter">
+        <h1>Criar conta</h1>
+        <p class="muted">Você já entra no sistema logo depois do cadastro.</p>
+
+        <label for="name">Nome</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-user" /></svg>
+          <input id="name" name="name" type="text" autocomplete="name" required maxlength="120" placeholder="Seu nome completo" />
+        </div>
+
+        <label for="email">E-mail</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-mail" /></svg>
+          <input id="email" name="email" type="email" autocomplete="username" required maxlength="255" placeholder="voce@email.com" />
+        </div>
+
+        <label for="password">Senha</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-lock" /></svg>
+          <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="200" placeholder="Mínimo de 8 caracteres" />
+          <button type="button" class="field-action" id="toggle-password" aria-label="Mostrar senha" aria-pressed="false">
+            <svg class="icon icon-main"><use href="#i-eye" /></svg><svg class="icon icon-alt"><use href="#i-eye-off" /></svg>
+          </button>
+        </div>
+        <div class="strength" id="strength" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <span class="strength-label" id="strength-label"></span>
+
+        <label for="confirm">Confirme a senha</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-lock" /></svg>
+          <input id="confirm" name="confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="200" placeholder="Repita a senha" />
+        </div>
+
+        <button type="submit" id="register-submit">Criar conta<svg class="icon"><use href="#i-arrow-right" /></svg></button>
+        <p id="register-msg" class="error" role="alert" hidden></p>
+
+        <div class="login-links">
+          <a href="/index.html" class="link-action">Já tenho conta: entrar</a>
+        </div>
+      </form>
+    </main>
+  </div>
 
   <script src="/js/api.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/ui.js"></script>
   <script src="/js/cadastro.js"></script>
 </body>
 </html>

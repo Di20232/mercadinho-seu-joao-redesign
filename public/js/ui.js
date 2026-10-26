@@ -309,6 +309,83 @@ function bump(node) {
   node.classList.add('bump');
 }
 
+// ---------- Diálogo de confirmação ----------
+// Substitui o confirm() do navegador por um cartão no mesmo visual do
+// sistema. Devolve uma Promise<boolean>: true só quando a pessoa confirma.
+function confirmDialog({ title, text, confirmLabel = 'Confirmar', cancelLabel = 'Voltar', tone = 'warn', iconName = 'triangle-alert' }) {
+  return new Promise((resolve) => {
+    const confirmBtn = el('button', { type: 'button', class: tone === 'danger' ? 'danger' : '' }, confirmLabel);
+    const cancelBtn = el('button', { type: 'button', class: 'secondary' }, cancelLabel);
+    const card = el('div', { class: 'card confirm-card', 'data-tone': tone, role: 'alertdialog', 'aria-modal': 'true' }, [
+      el('div', { class: 'confirm-icon' }, icon(iconName)),
+      el('h3', {}, title),
+      text ? el('p', {}, text) : null,
+      el('div', { class: 'form-actions' }, [cancelBtn, confirmBtn]),
+    ]);
+    const backdrop = el('div', { class: 'modal-backdrop' }, card);
+    document.body.appendChild(backdrop);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const finish = (answer) => {
+      document.removeEventListener('keydown', onKey, true);
+      backdrop.classList.add('is-closing');
+      setTimeout(() => {
+        backdrop.remove();
+        document.body.style.overflow = previousOverflow;
+      }, reducedMotion.matches ? 0 : 200);
+      resolve(answer);
+    };
+    // Na fase de captura e parando a propagação: um Esc aqui fecha só a
+    // confirmação, não o formulário que estiver aberto por baixo dela.
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); finish(false); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) finish(false); });
+    cancelBtn.addEventListener('click', () => finish(false));
+    confirmBtn.addEventListener('click', () => finish(true));
+    setTimeout(() => (tone === 'danger' ? cancelBtn : confirmBtn).focus(), 50);
+  });
+}
+
+// ---------- Força da senha ----------
+// Só orienta quem está escolhendo a senha; a regra que vale (mínimo de 8
+// caracteres) continua sendo a do servidor.
+function passwordStrength(value) {
+  if (!value) return { level: 0, label: '' };
+  let score = 0;
+  if (value.length >= 8) score += 1;
+  if (value.length >= 12) score += 1;
+  if (/[a-z]/.test(value) && /[A-Z]/.test(value)) score += 1;
+  if (/\d/.test(value) && /[^A-Za-z0-9]/.test(value)) score += 1;
+  if (value.length < 8) score = Math.min(score, 1) || 1;
+  const labels = ['', 'Fraca', 'Razoável', 'Boa', 'Forte'];
+  const level = Math.max(1, Math.min(4, score));
+  return { level, label: value.length < 8 ? 'Muito curta: use ao menos 8 caracteres' : labels[level] };
+}
+
+function bindStrengthMeter(input, meter, label) {
+  if (!input || !meter) return;
+  input.addEventListener('input', () => {
+    const { level, label: text } = passwordStrength(input.value);
+    meter.dataset.level = String(level);
+    if (label) label.textContent = text;
+  });
+}
+
+// Botão de olho que mostra/oculta a senha do campo vizinho.
+function bindPasswordToggle(button, input) {
+  if (!button || !input) return;
+  button.addEventListener('click', () => {
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    button.setAttribute('aria-pressed', String(show));
+    button.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
+    input.focus();
+  });
+}
+
 // ---------- Saudação ----------
 function greeting() {
   const h = new Date().getHours();

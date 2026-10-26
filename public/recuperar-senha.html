@@ -5,28 +5,63 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="referrer" content="no-referrer" />
   <title>Mercadinho do João — Recuperar senha</title>
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/style.css" />
+  <script src="/js/theme.js"></script>
 </head>
 <body>
-  <main class="login-wrap">
-    <form id="forgot-form" class="card login-card">
-      <div class="brand-mark" aria-hidden="true">MJ</div>
-      <h1>Recuperar senha</h1>
-      <p class="muted">Informe o e-mail da sua conta para escolher uma nova senha.</p>
-
-      <label for="email">E-mail</label>
-      <input id="email" name="email" type="email" autocomplete="username" required maxlength="255" />
-
-      <button type="submit">Continuar</button>
-      <p id="forgot-msg" class="success" role="status" hidden></p>
-
-      <div class="login-links">
-        <a href="/index.html" class="link-action">Voltar para o login</a>
+  <div class="auth-shell">
+    <aside class="auth-brand" aria-hidden="true">
+      <div class="auth-grid"></div>
+      <div class="auth-logo">
+        <span class="brand-mark"><svg class="icon"><use href="#i-store" /></svg></span>
+        Mercadinho do João
       </div>
-    </form>
-  </main>
+      <div class="auth-pitch reveal">
+        <h2>Esqueceu a senha? <em>Acontece.</em></h2>
+        <p>Informe o e-mail da conta e enviamos um link para você escolher uma senha nova. O link vale por pouco tempo e só pode ser usado uma vez.</p>
+      </div>
+      <p class="auth-foot">Sistema de vendas e estoque</p>
+    </aside>
+
+    <main class="auth-main">
+      <button id="theme-toggle" class="icon-btn theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <svg class="icon icon-moon"><use href="#i-moon" /></svg>
+        <svg class="icon icon-sun"><use href="#i-sun" /></svg>
+      </button>
+
+      <form id="forgot-form" class="auth-form view-enter">
+        <h1>Recuperar senha</h1>
+        <p class="muted">Informe o e-mail da sua conta para escolher uma nova senha.</p>
+
+        <label for="email">E-mail</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-mail" /></svg>
+          <input id="email" name="email" type="email" autocomplete="username" required maxlength="255" placeholder="voce@email.com" />
+        </div>
+
+        <button type="submit" id="forgot-submit">Enviar link<svg class="icon"><use href="#i-arrow-right" /></svg></button>
+        <p id="forgot-msg" class="success" role="status" hidden></p>
+
+        <div class="login-links">
+          <a href="/index.html" class="link-action">Voltar para o login</a>
+        </div>
+      </form>
+
+      <div class="auth-form auth-done view-enter" id="forgot-done" hidden>
+        <svg class="success-check" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26" /><path d="M17 29l7 7 15-16" /></svg>
+        <h1>Confira seu e-mail</h1>
+        <p id="forgot-done-text"></p>
+        <div class="login-links">
+          <a href="/index.html" class="link-action">Voltar para o login</a>
+        </div>
+      </div>
+    </main>
+  </div>
 
   <script src="/js/api.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/ui.js"></script>
   <script src="/js/forgot-password.js"></script>
 </body>
 </html>
