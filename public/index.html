@@ -4,32 +4,70 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mercadinho do João — Entrar</title>
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/style.css" />
+  <script src="/js/theme.js"></script>
 </head>
 <body>
-  <main class="login-wrap">
-    <form id="login-form" class="card login-card" novalidate>
-      <div class="brand-mark" aria-hidden="true">MJ</div>
-      <h1>Mercadinho do João</h1>
-      <p class="muted">Sistema de vendas e estoque</p>
-
-      <label for="login">E-mail ou usuário</label>
-      <input id="login" name="login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="255" />
-
-      <label for="password">Senha</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200" />
-
-      <button type="submit">Entrar</button>
-      <p id="login-error" class="error" role="alert" hidden></p>
-
-      <div class="login-links">
-        <a href="/recuperar-senha.html" class="link-action">Esqueci minha senha</a>
-        <a href="/cadastro.html" class="link-action">Cadastre-se</a>
+  <div class="auth-shell">
+    <aside class="auth-brand" aria-hidden="true">
+      <div class="auth-grid"></div>
+      <div class="auth-logo">
+        <span class="brand-mark"><svg class="icon"><use href="#i-store" /></svg></span>
+        Mercadinho do João
       </div>
-    </form>
-  </main>
+      <div class="auth-pitch reveal">
+        <h2>O caixa, o estoque e as contas <em>no mesmo lugar.</em></h2>
+        <p>Venda rápido no balcão e saiba na hora o que está acabando, o que vence e quanto entrou no mês.</p>
+        <ul class="auth-features">
+          <li class="reveal"><svg class="icon"><use href="#i-shopping-cart" /></svg>Vendas com comprovante na hora</li>
+          <li class="reveal"><svg class="icon"><use href="#i-hourglass" /></svg>Aviso do que vai acabar em 7 dias</li>
+          <li class="reveal"><svg class="icon"><use href="#i-chart-column" /></svg>Relatórios e planilhas do período</li>
+        </ul>
+      </div>
+      <p class="auth-foot">Sistema de vendas e estoque</p>
+    </aside>
+
+    <main class="auth-main">
+      <button id="theme-toggle" class="icon-btn theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <svg class="icon icon-moon"><use href="#i-moon" /></svg>
+        <svg class="icon icon-sun"><use href="#i-sun" /></svg>
+      </button>
+
+      <form id="login-form" class="auth-form view-enter" novalidate>
+        <h1>Entrar</h1>
+        <p class="muted">Use seu e-mail ou nome de usuário.</p>
+
+        <label for="login">E-mail ou usuário</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-user" /></svg>
+          <input id="login" name="login" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="255" placeholder="ex: joao ou joao@email.com" />
+        </div>
+
+        <label for="password">Senha</label>
+        <div class="field">
+          <svg class="icon"><use href="#i-lock" /></svg>
+          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200" placeholder="Sua senha" />
+          <button type="button" class="field-action" id="toggle-password" aria-label="Mostrar senha" aria-pressed="false">
+            <svg class="icon icon-main"><use href="#i-eye" /></svg>
+            <svg class="icon icon-alt"><use href="#i-eye-off" /></svg>
+          </button>
+        </div>
+
+        <button type="submit" id="login-submit">Entrar<svg class="icon"><use href="#i-arrow-right" /></svg></button>
+        <p id="login-error" class="error" role="alert" hidden></p>
+
+        <div class="login-links">
+          <a href="/recuperar-senha.html" class="link-action">Esqueci minha senha</a>
+          <a href="/cadastro.html" class="link-action">Criar conta</a>
+        </div>
+      </form>
+    </main>
+  </div>
 
   <script src="/js/api.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/ui.js"></script>
   <script src="/js/login.js"></script>
 </body>
 </html>

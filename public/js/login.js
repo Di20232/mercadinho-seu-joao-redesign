@@ -13,9 +13,26 @@ const form = document.getElementById('login-form');
 const errorEl = document.getElementById('login-error');
 const loginInput = document.getElementById('login');
 const passwordInput = document.getElementById('password');
+const submitBtn = document.getElementById('login-submit');
+const togglePassword = document.getElementById('toggle-password');
+
+stagger(document.querySelectorAll('.reveal'), 1);
+document.getElementById('theme-toggle').addEventListener('click', () => window.mjTheme.toggle());
+loginInput.focus();
+
+togglePassword.addEventListener('click', () => {
+  const show = passwordInput.type === 'password';
+  passwordInput.type = show ? 'text' : 'password';
+  togglePassword.setAttribute('aria-pressed', String(show));
+  togglePassword.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
+  passwordInput.focus();
+});
 
 function showLoginError(message) {
   errorEl.textContent = message;
+  // Reexibe do zero para a animação de "balançar" rodar a cada erro.
+  errorEl.hidden = true;
+  void errorEl.offsetWidth;
   errorEl.hidden = false;
 }
 
@@ -50,10 +67,12 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
+  setButtonLoading(submitBtn, true);
   try {
     await api.post('/auth/login', { login, password });
     location.href = '/app.html';
   } catch (err) {
+    setButtonLoading(submitBtn, false);
     showLoginError(friendlyLoginError(err));
   }
 });

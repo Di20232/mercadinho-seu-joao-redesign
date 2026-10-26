@@ -4,80 +4,178 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mercadinho do João</title>
+  <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/style.css" />
+  <script src="/js/theme.js"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">Mercadinho do João</div>
-    <nav id="tabs" class="tabs">
-      <button data-tab="dashboard" class="tab-btn active">Painel</button>
-      <button data-tab="vendas" class="tab-btn">Vendas</button>
-      <button data-tab="produtos" class="tab-btn">Produtos</button>
-      <button data-tab="estoque" class="tab-btn" data-admin-only>Estoque</button>
-      <button data-tab="importar" class="tab-btn" data-admin-only>Importar</button>
-      <button data-tab="relatorios" class="tab-btn" data-admin-only>Relatórios</button>
-      <button data-tab="usuarios" class="tab-btn" data-admin-only>Usuários</button>
-    </nav>
-    <div class="user-box">
-      <span id="user-avatar" class="user-avatar" aria-hidden="true"></span>
-      <span id="user-name"></span>
-      <button id="logout-btn" class="secondary">Sair</button>
-    </div>
-  </header>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Menu principal">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true"><svg class="icon"><use href="#i-store" /></svg></span>
+        <span class="brand-text"><strong>Mercadinho</strong><small>do João</small></span>
+      </div>
 
-  <main id="content" class="content"></main>
+      <nav id="tabs" class="nav">
+        <span class="nav-indicator" id="nav-indicator" aria-hidden="true"></span>
+        <p class="nav-section">Operação</p>
+        <button data-tab="dashboard" class="tab-btn active" title="Painel"><svg class="icon"><use href="#i-layout-dashboard" /></svg><span>Painel</span></button>
+        <button data-tab="vendas" class="tab-btn" title="Vendas"><svg class="icon"><use href="#i-shopping-cart" /></svg><span>Vendas</span></button>
+        <button data-tab="produtos" class="tab-btn" title="Produtos"><svg class="icon"><use href="#i-package" /></svg><span>Produtos</span></button>
+        <p class="nav-section" data-admin-only>Gestão</p>
+        <button data-tab="estoque" class="tab-btn" title="Estoque" data-admin-only><svg class="icon"><use href="#i-warehouse" /></svg><span>Estoque</span></button>
+        <button data-tab="importar" class="tab-btn" title="Importar" data-admin-only><svg class="icon"><use href="#i-file-up" /></svg><span>Importar</span></button>
+        <button data-tab="relatorios" class="tab-btn" title="Relatórios" data-admin-only><svg class="icon"><use href="#i-chart-column" /></svg><span>Relatórios</span></button>
+        <button data-tab="usuarios" class="tab-btn" title="Usuários" data-admin-only><svg class="icon"><use href="#i-users" /></svg><span>Usuários</span></button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <button id="sidebar-toggle" class="tab-btn" type="button" title="Recolher menu" aria-expanded="true">
+          <svg class="icon collapse-icon-close"><use href="#i-panel-left-close" /></svg>
+          <svg class="icon collapse-icon-open"><use href="#i-panel-left-open" /></svg>
+          <span>Recolher menu</span>
+        </button>
+      </div>
+    </aside>
+    <div class="sidebar-scrim" id="sidebar-scrim"></div>
+
+    <div class="main">
+      <header class="topbar" id="topbar">
+        <button id="menu-btn" class="icon-btn mobile-only" type="button" aria-label="Abrir menu"><svg class="icon"><use href="#i-menu" /></svg></button>
+        <div class="topbar-title" id="topbar-title">
+          <h1 id="page-title">Painel</h1>
+          <p id="page-subtitle"></p>
+        </div>
+        <div class="topbar-actions">
+          <button id="theme-toggle" class="icon-btn theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+            <svg class="icon icon-moon"><use href="#i-moon" /></svg>
+            <svg class="icon icon-sun"><use href="#i-sun" /></svg>
+          </button>
+          <div class="user-chip">
+            <span id="user-avatar" class="user-avatar" aria-hidden="true"></span>
+            <span class="user-meta"><strong id="user-name"></strong><small id="user-role"></small></span>
+          </div>
+          <button id="logout-btn" class="icon-btn" type="button" aria-label="Sair" title="Sair"><svg class="icon"><use href="#i-log-out" /></svg></button>
+        </div>
+      </header>
+
+      <main id="content" class="content"></main>
+    </div>
+  </div>
+  <div id="toasts" class="toast-stack" aria-live="polite"></div>
 
   <template id="tpl-dashboard">
     <section>
-      <h2>Painel</h2>
-      <div id="admin-summary" class="grid-cards" hidden>
-        <div class="card stat"><span class="stat-label">Vendas hoje</span><span id="stat-today" class="stat-value">—</span></div>
-        <div class="card stat"><span class="stat-label">Vendas no mês</span><span id="stat-month" class="stat-value">—</span></div>
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi is-loading"><div class="kpi-top"><div class="skeleton skeleton-line w-40"></div><span class="kpi-icon"></span></div><div class="skeleton skeleton-value"></div><div class="skeleton skeleton-line w-60"></div></div>
+        <div class="kpi is-loading"><div class="kpi-top"><div class="skeleton skeleton-line w-40"></div><span class="kpi-icon"></span></div><div class="skeleton skeleton-value"></div><div class="skeleton skeleton-line w-60"></div></div>
+        <div class="kpi is-loading"><div class="kpi-top"><div class="skeleton skeleton-line w-40"></div><span class="kpi-icon"></span></div><div class="skeleton skeleton-value"></div><div class="skeleton skeleton-line w-60"></div></div>
+        <div class="kpi is-loading"><div class="kpi-top"><div class="skeleton skeleton-line w-40"></div><span class="kpi-icon"></span></div><div class="skeleton skeleton-value"></div><div class="skeleton skeleton-line w-60"></div></div>
       </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <h3>Estoque baixo</h3>
-          <div class="table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Estoque</th><th>Mínimo</th></tr></thead><tbody id="tb-low-stock"></tbody></table></div>
+      <div class="dash-grid" id="admin-charts" data-admin-only>
+        <div class="card reveal">
+          <div class="card-head">
+            <span class="card-icon"><svg class="icon"><use href="#i-trending-up" /></svg></span>
+            <div><h3>Vendas dos últimos 14 dias</h3><p class="muted" id="chart-sales-caption">Carregando…</p></div>
+            <span class="chip positive" id="chart-sales-total">—</span>
+          </div>
+          <div id="chart-sales" class="chart"><div class="skeleton skeleton-block"></div></div>
         </div>
-        <div class="card">
-          <h3>Previsão de esgotar em 7 dias</h3>
-          <div class="table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Estoque</th><th>Dias restantes</th></tr></thead><tbody id="tb-soon-out"></tbody></table></div>
+        <div class="card reveal">
+          <div class="card-head" data-tone="warn">
+            <span class="card-icon"><svg class="icon"><use href="#i-sparkles" /></svg></span>
+            <div><h3>Mais vendidos no mês</h3><p class="muted">Por receita</p></div>
+          </div>
+          <div id="chart-top" class="bars"></div>
         </div>
       </div>
 
-      <div class="grid-2">
-        <div class="card">
-          <h3>Vencendo em breve</h3>
-          <div class="table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Validade</th><th>Estoque</th></tr></thead><tbody id="tb-expiring"></tbody></table></div>
+      <div class="dash-grid three">
+        <div class="card reveal" data-tone="danger">
+          <div class="card-head">
+            <span class="card-icon"><svg class="icon"><use href="#i-triangle-alert" /></svg></span>
+            <div><h3>Estoque baixo</h3><p class="muted">Abaixo do mínimo</p></div>
+            <span class="count-pill" id="count-low-stock">0</span>
+          </div>
+          <ul class="item-list" id="tb-low-stock"></ul>
         </div>
-        <div class="card" id="card-slow-moving" hidden>
-          <h3>Produtos parados (sem venda em 60 dias)</h3>
-          <div class="table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Estoque</th></tr></thead><tbody id="tb-slow-moving"></tbody></table></div>
+        <div class="card reveal" data-tone="warn">
+          <div class="card-head">
+            <span class="card-icon"><svg class="icon"><use href="#i-hourglass" /></svg></span>
+            <div><h3>Vai acabar em 7 dias</h3><p class="muted">Pelo ritmo de vendas</p></div>
+            <span class="count-pill" id="count-soon-out">0</span>
+          </div>
+          <ul class="item-list" id="tb-soon-out"></ul>
         </div>
+        <div class="card reveal" data-tone="info">
+          <div class="card-head">
+            <span class="card-icon"><svg class="icon"><use href="#i-calendar" /></svg></span>
+            <div><h3>Vencendo em breve</h3><p class="muted">Confira a validade</p></div>
+            <span class="count-pill" id="count-expiring">0</span>
+          </div>
+          <ul class="item-list" id="tb-expiring"></ul>
+        </div>
+      </div>
+
+      <div class="card reveal" id="card-slow-moving" data-admin-only>
+        <div class="card-head">
+          <span class="card-icon"><svg class="icon"><use href="#i-package-x" /></svg></span>
+          <div><h3>Produtos parados</h3><p class="muted">Sem venda nos últimos 60 dias</p></div>
+          <span class="count-pill" id="count-slow-moving">0</span>
+        </div>
+        <ul class="item-list" id="tb-slow-moving"></ul>
       </div>
     </section>
   </template>
 
   <template id="tpl-vendas">
     <section>
-      <h2>Nova venda</h2>
-      <div class="card">
-        <div class="sale-picker">
-          <input id="sale-search" type="text" placeholder="Buscar produto por nome ou código de barras..." aria-label="Buscar produto para adicionar à venda" />
-          <div id="sale-results" class="search-results"></div>
+      <div class="pos-grid">
+        <div class="card pos-main reveal">
+          <div class="sale-picker">
+            <div class="search-field">
+              <svg class="icon"><use href="#i-scan-barcode" /></svg>
+              <input id="sale-search" type="text" autocomplete="off" placeholder="Buscar produto pelo nome…" aria-label="Buscar produto para adicionar à venda" />
+              <kbd>Enter</kbd>
+            </div>
+            <div id="sale-results" class="search-results" role="listbox"></div>
+          </div>
+
+          <div class="cart-head">
+            <h3>Itens da venda</h3>
+            <span class="count-pill" id="cart-count">0</span>
+          </div>
+          <div class="table-wrap" id="cart-table-wrap" hidden><table class="table cart-table">
+            <thead><tr><th>Produto</th><th>Quantidade</th><th>Preço</th><th>Subtotal</th><th></th></tr></thead>
+            <tbody id="cart-body"></tbody>
+          </table></div>
+          <div id="cart-empty" class="cart-empty"></div>
         </div>
-        <div class="table-wrap"><table class="table">
-          <thead><tr><th>Produto</th><th>Qtd</th><th>Preço</th><th>Subtotal</th><th></th></tr></thead>
-          <tbody id="cart-body"></tbody>
-        </table></div>
-        <div class="cart-total">Total: <strong id="cart-total">R$ 0,00</strong></div>
-        <button id="confirm-sale-btn" disabled>Confirmar venda</button>
-        <p id="sale-msg" class="error" hidden></p>
+
+        <aside class="card pos-summary reveal">
+          <h3>Resumo da venda</h3>
+          <dl class="summary-lines">
+            <div><dt>Produtos</dt><dd id="cart-lines">0</dd></div>
+            <div><dt>Unidades</dt><dd id="cart-units">0</dd></div>
+          </dl>
+          <div class="summary-total">
+            <span>Total a receber</span>
+            <strong id="cart-total">R$ 0,00</strong>
+          </div>
+          <button id="confirm-sale-btn" class="btn-lg btn-block" type="button" disabled>
+            <svg class="icon"><use href="#i-check" /></svg><span id="confirm-sale-label">Confirmar venda</span>
+          </button>
+          <p id="sale-msg" class="error" hidden></p>
+          <p class="summary-hint">Use ↑ ↓ para escolher na busca e Enter para adicionar.</p>
+        </aside>
       </div>
 
-      <h2>Vendas recentes</h2>
-      <div class="card">
+      <div class="card reveal">
+        <div class="card-head">
+          <span class="card-icon"><svg class="icon"><use href="#i-receipt" /></svg></span>
+          <div><h3>Vendas recentes</h3><p class="muted">As 15 últimas registradas</p></div>
+        </div>
         <div class="table-wrap"><table class="table">
           <thead><tr><th>Data</th><th>Vendedor</th><th>Itens</th><th>Total</th><th></th></tr></thead>
           <tbody id="sales-list"></tbody>
@@ -89,10 +187,9 @@
   <template id="tpl-produtos">
     <section>
       <div class="section-head">
-        <h2>Produtos</h2>
-        <button id="new-product-btn" data-admin-only>+ Novo produto</button>
+        <div class="search-field"><svg class="icon"><use href="#i-search" /></svg><input id="product-search" type="text" autocomplete="off" placeholder="Buscar produtos pelo nome…" aria-label="Buscar produtos" /></div>
+        <button id="new-product-btn" type="button" data-admin-only><svg class="icon"><use href="#i-plus" /></svg>Novo produto</button>
       </div>
-      <input id="product-search" type="text" placeholder="Buscar produtos..." class="full" aria-label="Buscar produtos" />
       <div class="card">
         <div class="table-wrap"><table class="table">
           <thead><tr><th>Nome</th><th>Categoria</th><th>Estoque</th><th>Mín.</th><th>Preço</th><th data-admin-only>Custo</th><th>Validade</th><th></th></tr></thead>
@@ -127,7 +224,6 @@
 
   <template id="tpl-estoque">
     <section>
-      <h2>Estoque</h2>
       <div class="grid-2">
         <form id="entry-form" class="card">
           <h3>Entrada de mercadoria (compra)</h3>
@@ -163,23 +259,25 @@
 
   <template id="tpl-receipt">
     <div class="card receipt-card" id="receipt-card">
-      <h3>Venda confirmada</h3>
-      <p class="muted" id="receipt-meta"></p>
+      <div class="receipt-hero">
+        <svg class="success-check" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26" /><path d="M17 29l7 7 15-16" /></svg>
+        <h3>Venda confirmada</h3>
+        <p class="muted" id="receipt-meta"></p>
+      </div>
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Produto</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr></thead>
         <tbody id="receipt-items"></tbody>
       </table></div>
-      <p class="cart-total">Total: <strong id="receipt-total">R$ 0,00</strong></p>
+      <div class="receipt-total"><span>Total</span><strong id="receipt-total">R$ 0,00</strong></div>
       <div class="form-actions no-print">
-        <button type="button" id="receipt-print-btn">Imprimir</button>
-        <button type="button" id="receipt-close-btn" class="secondary">Nova venda</button>
+        <button type="button" id="receipt-close-btn"><svg class="icon"><use href="#i-plus" /></svg>Nova venda</button>
+        <button type="button" id="receipt-print-btn" class="secondary"><svg class="icon"><use href="#i-printer" /></svg>Imprimir</button>
       </div>
     </div>
   </template>
 
   <template id="tpl-importar">
     <section>
-      <h2>Importar planilha</h2>
 
       <div class="card" id="imp-step-source">
         <h3>1. Escolha a planilha</h3>
@@ -268,7 +366,6 @@
 
   <template id="tpl-relatorios">
     <section>
-      <h2>Relatórios</h2>
       <div class="card">
         <div class="filters">
           <label for="rep-from">De</label><input id="rep-from" type="date" />
@@ -299,8 +396,8 @@
   <template id="tpl-usuarios">
     <section>
       <div class="section-head">
-        <h2>Usuários</h2>
-        <button id="new-user-btn">+ Novo usuário</button>
+        <p class="muted">Quem pode entrar no sistema e com qual perfil.</p>
+        <button id="new-user-btn" type="button"><svg class="icon"><use href="#i-user-plus" /></svg>Novo usuário</button>
       </div>
       <div class="card">
         <div class="table-wrap"><table class="table">
@@ -328,6 +425,8 @@
   </template>
 
   <script src="/js/api.js"></script>
+  <script src="/js/icons.js"></script>
+  <script src="/js/ui.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
