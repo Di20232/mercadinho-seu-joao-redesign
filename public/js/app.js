@@ -515,6 +515,18 @@ function renderCart() {
   setConfirmButton();
 }
 
+// Última confirmação sem resposta de sucesso. Se a rede cair depois de o
+// servidor gravar, tentar de novo com o mesmo carrinho reenvia a mesma
+// Idempotency-Key e recebe a venda já criada, em vez de registrar outra.
+let pendingSale = null; // { body, key }
+
+function newIdempotencyKey() {
+  // randomUUID só existe em contexto seguro (HTTPS/localhost); acessando
+  // pelo IP da rede local em HTTP, getRandomValues continua disponível.
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function confirmSale() {
   if (saleInFlight || cart.length === 0) return;
   const msg = document.getElementById('sale-msg');
@@ -522,7 +534,12 @@ async function confirmSale() {
   saleInFlight = true;
   setConfirmButton();
   try {
-    const sale = await api.post('/sales', { items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })) });
+    const items = cart.map((i) => ({ productId: i.productId, quantity: i.quantity }));
+    // Carrinho diferente da tentativa anterior é outra venda: chave nova.
+    const body = JSON.stringify(items);
+    if (pendingSale?.body !== body) pendingSale = { body, key: newIdempotencyKey() };
+    const sale = await api.post('/sales', { items }, { 'Idempotency-Key': pendingSale.key });
+    pendingSale = null;
     cart = [];
     cartAnim = { enterId: null, bumpId: null };
     saleInFlight = false;

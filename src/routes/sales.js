@@ -29,16 +29,67 @@ const saleSchema = z.object({
     .max(100),
 });
 
+// O caixa gera uma chave por carrinho (cabeçalho Idempotency-Key) e a repete
+// se a confirmação falhar no meio — rede caiu depois do banco gravar, clique
+// duplo, nova tentativa. Sem isso cada repetição vira outra venda e baixa o
+// estoque de novo. A chave é opcional para não quebrar outros clientes da API.
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_-]{8,100}$/;
+
+const saleResponseInclude = { items: { include: { product: { select: { name: true, unit: true } } } } };
+
+function toSaleResponse(sale) {
+  return {
+    id: sale.id,
+    totalAmount: Number(sale.totalAmount),
+    createdAt: sale.createdAt,
+    itemCount: sale.items.length,
+    items: sale.items.map((i) => ({
+      product: i.product.name,
+      unit: i.product.unit,
+      quantity: Number(i.quantity),
+      unitPrice: Number(i.unitPrice),
+      subtotal: Number(i.subtotal),
+    })),
+  };
+}
+
+function sameItems(sale, items) {
+  const key = (productId, quantity) => `${productId}:${Number(quantity).toFixed(3)}`;
+  const saved = sale.items.map((i) => key(i.productId, i.quantity)).sort();
+  const requested = items.map((i) => key(i.productId, i.quantity)).sort();
+  return saved.length === requested.length && saved.every((k, idx) => k === requested[idx]);
+}
+
+// Responde com a venda já gravada sob esta chave; false se ainda não existe.
+// Mesma chave com outro carrinho (ou de outro usuário) é erro do cliente, não
+// repetição: devolver a venda antiga esconderia que a nova nunca foi registrada.
+async function replayExistingSale(idempotencyKey, req, res) {
+  const existing = await prisma.sale.findUnique({ where: { idempotencyKey }, include: saleResponseInclude });
+  if (!existing) return false;
+  if (existing.sellerId !== req.user.sub || !sameItems(existing, req.body.items)) {
+    throw httpError(422, 'Esta chave de idempotência já foi usada em outra venda.');
+  }
+  res.status(200).json(toSaleResponse(existing));
+  return true;
+}
+
 router.post('/', validate(saleSchema), async (req, res) => {
   const { items } = req.body;
+
+  const idempotencyKey = req.get('Idempotency-Key');
+  if (idempotencyKey !== undefined && !IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
+    throw httpError(400, 'Cabeçalho Idempotency-Key inválido: use de 8 a 100 letras, números, "-" ou "_".');
+  }
 
   const productIds = items.map((i) => i.productId);
   if (new Set(productIds).size !== productIds.length) {
     throw httpError(400, 'Itens duplicados na venda; agrupe as quantidades em um único item.');
   }
 
+  if (idempotencyKey && await replayExistingSale(idempotencyKey, req, res)) return;
+
   const sale = await prisma.$transaction(async (tx) => {
-    const created = await tx.sale.create({ data: { sellerId: req.user.sub, totalAmount: '0' } });
+    const created = await tx.sale.create({ data: { sellerId: req.user.sub, totalAmount: '0', idempotencyKey } });
 
     // Uma única consulta para todos os itens, em vez de um SELECT por item
     // dentro do laço (N+1). Numa venda de 20 itens isso troca 20 idas ao
@@ -103,26 +154,25 @@ router.post('/', validate(saleSchema), async (req, res) => {
     return tx.sale.update({
       where: { id: created.id },
       data: { totalAmount: total.toFixed(2) },
-      include: { items: { include: { product: { select: { name: true, unit: true } } } } },
+      include: saleResponseInclude,
     });
-  }, { timeout: 15_000, maxWait: 5_000 });
+  }, { timeout: 15_000, maxWait: 5_000 }).catch((err) => {
+    // Duas requisições com a mesma chave ao mesmo tempo passam pela consulta
+    // acima, mas o índice único só deixa uma gravar; a outra é desfeita
+    // inteira (estoque incluído) e responde com a venda que ficou.
+    if (idempotencyKey && err.code === 'P2002') return null;
+    throw err;
+  });
   // Timeout maior que o padrão do Prisma (5s): uma venda com até 100 itens faz
   // várias consultas sequenciais por item dentro da mesma transação, e sob
   // carga isso poderia estourar o limite padrão e falhar sem necessidade.
 
-  res.status(201).json({
-    id: sale.id,
-    totalAmount: Number(sale.totalAmount),
-    createdAt: sale.createdAt,
-    itemCount: sale.items.length,
-    items: sale.items.map((i) => ({
-      product: i.product.name,
-      unit: i.product.unit,
-      quantity: Number(i.quantity),
-      unitPrice: Number(i.unitPrice),
-      subtotal: Number(i.subtotal),
-    })),
-  });
+  if (!sale) {
+    if (await replayExistingSale(idempotencyKey, req, res)) return;
+    throw httpError(409, 'Conflito ao registrar a venda; tente de novo.');
+  }
+
+  res.status(201).json(toSaleResponse(sale));
 });
 
 router.get('/', async (req, res) => {

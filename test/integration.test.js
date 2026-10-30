@@ -222,6 +222,72 @@ test('condição de corrida: vendas simultâneas nunca vendem além do estoque d
   assert.equal(after1.body.currentStock, 0, 'o estoque nunca pode ficar negativo');
 });
 
+test('idempotência: repetir a venda com a mesma Idempotency-Key devolve a mesma venda e baixa o estoque uma vez só', async () => {
+  const product = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Idempotente', unit: 'UN', costPrice: 1, salePrice: 4, initialStock: 10 },
+  });
+  const send = () => request(baseUrl, adminJar, '/api/sales', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': 'venda-repetida-0001' },
+    body: { items: [{ productId: product.body.id, quantity: 3 }] },
+  });
+
+  const first = await send();
+  const retry = await send();
+  assert.equal(first.status, 201);
+  assert.equal(retry.status, 200, 'a repetição responde com a venda já criada');
+  assert.equal(retry.body.id, first.body.id);
+  assert.deepEqual(retry.body.items, first.body.items);
+
+  const after1 = await request(baseUrl, adminJar, `/api/products/${product.body.id}`);
+  assert.equal(after1.body.currentStock, 7, 'o estoque só pode ser baixado uma vez');
+});
+
+test('idempotência: requisições simultâneas com a mesma chave criam uma única venda', async () => {
+  const product = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Idempotente Simultâneo', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 10 },
+  });
+
+  const results = await Promise.all(
+    Array.from({ length: 10 }, () =>
+      request(baseUrl, adminJar, '/api/sales', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': 'venda-simultanea-0001' },
+        body: { items: [{ productId: product.body.id, quantity: 1 }] },
+      }),
+    ),
+  );
+
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 200, 200, 200, 200, 200, 200, 200, 200, 201]);
+  assert.equal(new Set(results.map((r) => r.body.id)).size, 1, 'todas as respostas apontam para a mesma venda');
+  assert.equal(await prisma.sale.count({ where: { idempotencyKey: 'venda-simultanea-0001' } }), 1);
+
+  const after1 = await request(baseUrl, adminJar, `/api/products/${product.body.id}`);
+  assert.equal(after1.body.currentStock, 9);
+});
+
+test('idempotência: chave reaproveitada em outro carrinho é recusada e chave malformada dá 400', async () => {
+  const product = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Chave Reusada', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 10 },
+  });
+  const sell = (key, quantity) => request(baseUrl, adminJar, '/api/sales', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': key },
+    body: { items: [{ productId: product.body.id, quantity }] },
+  });
+
+  assert.equal((await sell('venda-reusada-0001', 1)).status, 201);
+  assert.equal((await sell('venda-reusada-0001', 2)).status, 422, 'outro carrinho com a mesma chave não pode virar a venda antiga');
+  assert.equal((await sell('curta', 1)).status, 400);
+  assert.equal((await sell('com espaço inválido', 1)).status, 400);
+
+  const after1 = await request(baseUrl, adminJar, `/api/products/${product.body.id}`);
+  assert.equal(after1.body.currentStock, 9);
+});
+
 test('revogação de sessão: usuário desativado perde acesso imediatamente, mesmo com token ainda válido', async () => {
   const created = await request(baseUrl, adminJar, '/api/users', {
     method: 'POST',

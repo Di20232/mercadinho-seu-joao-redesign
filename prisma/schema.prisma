@@ -79,6 +79,8 @@ model Sale {
   seller      User            @relation(fields: [sellerId], references: [id])
   totalAmount Decimal         @default(0) @db.Decimal(12, 2)
   canceled    Boolean         @default(false)
+  // Cabeçalho Idempotency-Key da confirmação: repetir a requisição devolve esta venda.
+  idempotencyKey String?    @unique
   createdAt   DateTime        @default(now())
   items       SaleItem[]
   movements   StockMovement[]

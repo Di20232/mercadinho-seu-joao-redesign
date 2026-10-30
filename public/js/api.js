@@ -1,8 +1,8 @@
 // Wrapper de fetch: sempre envia cookies (sessão), sempre inclui o cabeçalho
 // que nossa defesa anti-CSRF exige em requisições que alteram estado, e
 // padroniza o tratamento de erros da API.
-async function apiRequest(path, { method = 'GET', body } = {}) {
-  const headers = { 'X-Requested-With': 'fetch' };
+async function apiRequest(path, { method = 'GET', body, headers: extraHeaders } = {}) {
+  const headers = { 'X-Requested-With': 'fetch', ...extraHeaders };
   // Upload de planilha: o Content-Type do multipart precisa carregar o
   // "boundary" que o próprio navegador gera — defini-lo à mão quebraria a
   // leitura do arquivo no servidor.
@@ -38,7 +38,7 @@ async function apiRequest(path, { method = 'GET', body } = {}) {
 
 const api = {
   get: (path) => apiRequest(path),
-  post: (path, body) => apiRequest(path, { method: 'POST', body }),
+  post: (path, body, headers) => apiRequest(path, { method: 'POST', body, headers }),
   put: (path, body) => apiRequest(path, { method: 'PUT', body }),
   del: (path) => apiRequest(path, { method: 'DELETE' }),
 };
