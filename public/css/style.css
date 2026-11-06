@@ -1013,6 +1013,17 @@ tr.row-error td { background: var(--danger-soft); }
 tr.row-skip td { color: var(--text-muted); }
 
 body:not(.role-admin) [data-admin-only] { display: none !important; }
+/* Cada pedaço da tela aparece só para quem tem a permissão (classes "can-*" no body). */
+body:not(.can-stock) [data-perm="stock"],
+body:not(.can-reports) [data-perm="reports"],
+body:not(.can-prices) [data-perm="prices"],
+body:not(.can-catalog) [data-perm="catalog"],
+body:not(.can-manage) [data-perm="manage"],
+body.can-prices [data-perm-hide="prices"] { display: none !important; }
+
+.perm-list { border: 0; padding: 0; margin: 14px 0 0; display: grid; gap: 2px; }
+.perm-list .switch { margin: 8px 0 0; font-weight: 500; }
+#u-template { margin-top: 6px; }
 
 /* ---------- Modal: cabeçalho, grade de campos, confirmação ---------- */
 

@@ -3,7 +3,16 @@ const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
 const httpError = require('../httpError');
-const { authenticate, authorize } = require('../auth');
+const { authenticate } = require('../auth');
+const { can, OWN_SALE_CANCEL_MINUTES } = require('../permissions');
+
+// Quem tem "cancelar qualquer venda" cancela tudo; os demais só a própria,
+// e só nos primeiros minutos depois de fechar.
+function canCancelSale(user, sale, now = Date.now()) {
+  if (can(user, 'sales.cancel')) return true;
+  const ageMinutes = (now - new Date(sale.createdAt).getTime()) / 60_000;
+  return sale.sellerId === user.sub && ageMinutes <= OWN_SALE_CANCEL_MINUTES;
+}
 const { parseDateParam, clampIntParam } = require('../queryHelpers');
 const { applyStockDelta } = require('../stockOps');
 
@@ -104,6 +113,9 @@ router.post('/', validate(saleSchema), async (req, res) => {
     for (const item of items) {
       const product = productById.get(item.productId);
       if (!product || !product.active) throw httpError(404, 'Um dos produtos da venda não foi encontrado.');
+      if (product.salePrice === null || product.costPrice === null) {
+        throw httpError(409, `"${product.name}" ainda está aguardando preço e não pode ser vendido.`);
+      }
 
       // UPDATE condicional atômico: só decrementa se houver saldo suficiente.
       // A checagem "currentStock >= quantity" é avaliada e aplicada pelo banco
@@ -182,8 +194,8 @@ router.get('/', async (req, res) => {
   const to = parseDateParam(req.query.to, 'to');
 
   const where = { canceled: false };
-  // Funcionário (caixa) só enxerga as próprias vendas; só o administrador vê todas.
-  if (req.user.role !== 'ADMIN') where.sellerId = req.user.sub;
+  // Sem a permissão "ver as vendas de todos", a pessoa só enxerga as próprias.
+  if (!can(req.user, 'sales.viewAll')) where.sellerId = req.user.sub;
   if (from || to) where.createdAt = {};
   if (from) where.createdAt.gte = from;
   if (to) where.createdAt.lte = to;
@@ -209,6 +221,7 @@ router.get('/', async (req, res) => {
       totalAmount: Number(s.totalAmount),
       itemCount: s._count.items,
       createdAt: s.createdAt,
+      canCancel: canCancelSale(req.user, s),
     })),
   });
 });
@@ -219,7 +232,7 @@ router.get('/:id', async (req, res) => {
     include: { seller: { select: { name: true } }, items: { include: { product: { select: { name: true } } } } },
   });
   if (!sale) throw httpError(404, 'Venda não encontrada.');
-  if (req.user.role !== 'ADMIN' && sale.sellerId !== req.user.sub) {
+  if (!can(req.user, 'sales.viewAll') && sale.sellerId !== req.user.sub) {
     throw httpError(403, 'Sem permissão para ver esta venda.');
   }
 
@@ -238,10 +251,13 @@ router.get('/:id', async (req, res) => {
   });
 });
 
-router.post('/:id/cancel', authorize('ADMIN'), async (req, res) => {
+router.post('/:id/cancel', async (req, res) => {
   const sale = await prisma.$transaction(async (tx) => {
     const existing = await tx.sale.findUnique({ where: { id: req.params.id }, include: { items: true } });
     if (!existing) throw httpError(404, 'Venda não encontrada.');
+    if (!canCancelSale(req.user, existing)) {
+      throw httpError(403, `Você só pode cancelar a sua própria venda até ${OWN_SALE_CANCEL_MINUTES} minutos depois de fechá-la.`);
+    }
     if (existing.canceled) throw httpError(409, 'Venda já cancelada.');
 
     for (const item of existing.items) {

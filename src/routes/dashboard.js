@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../db');
 const config = require('../config');
 const { authenticate } = require('../auth');
+const { can } = require('../permissions');
 const { getStockForecast, splitForecastAlerts, getSlowMovingProducts } = require('../forecast');
 
 const router = express.Router();
@@ -29,8 +30,17 @@ router.get('/', async (req, res) => {
     })),
   };
 
-  // Números financeiros e produtos parados ficam visíveis só para o administrador.
-  if (req.user.role === 'ADMIN') {
+  // Aviso para quem define preço: produtos que o estoque cadastrou sem preço.
+  if (can(req.user, 'prices.manage')) {
+    payload.pricePending = await prisma.product.findMany({
+      where: { active: true, OR: [{ salePrice: null }, { costPrice: null }] },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, createdAt: true },
+    });
+  }
+
+  // Números financeiros e produtos parados: só para quem vê relatórios.
+  if (can(req.user, 'reports.view')) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     const startOfMonth = new Date();

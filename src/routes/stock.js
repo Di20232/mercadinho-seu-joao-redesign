@@ -2,7 +2,8 @@ const express = require('express');
 const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
-const { authenticate, authorize } = require('../auth');
+const { authenticate } = require('../auth');
+const { requirePermission } = require('../permissions');
 const { parseDateParam, parseEnumParam, clampIntParam } = require('../queryHelpers');
 const { applyStockDelta } = require('../stockOps');
 const { generateCsv, generateXlsx } = require('../exportService');
@@ -10,7 +11,7 @@ const { generateCsv, generateXlsx } = require('../exportService');
 const router = express.Router();
 // Movimentações de estoque (entradas de compra e ajustes/perdas) são
 // exclusivas do dono/administrador, para manter um único responsável pelos números.
-router.use(authenticate, authorize('ADMIN'));
+router.use(authenticate, requirePermission('stock.manage'));
 
 const entrySchema = z.object({
   productId: z.string().uuid(),

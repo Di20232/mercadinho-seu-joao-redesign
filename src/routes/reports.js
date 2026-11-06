@@ -1,12 +1,13 @@
 const express = require('express');
 const prisma = require('../db');
-const { authenticate, authorize } = require('../auth');
+const { authenticate } = require('../auth');
+const { requirePermission } = require('../permissions');
 const { getStockForecast, getSlowMovingProducts } = require('../forecast');
 const { parseDateParam, clampIntParam } = require('../queryHelpers');
 const { generateCsv, generateXlsx } = require('../exportService');
 
 const router = express.Router();
-router.use(authenticate, authorize('ADMIN'));
+router.use(authenticate, requirePermission('reports.view'));
 
 async function sendExport(res, format, filenamePrefix, sheetName, headers, rows) {
   const fmt = (format || 'csv').toLowerCase();
