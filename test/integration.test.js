@@ -932,3 +932,117 @@ test('exportação: caixa é bloqueado (403) em todas as rotas de exportação',
   }
 });
 
+
+// ---------- Perfis e permissões por pessoa ----------
+
+// Cria um funcionário com as permissões dadas e devolve o "navegador" já logado.
+async function loginWithPermissions(email, permissions) {
+  const passwordHash = await bcrypt.hash('SenhaPerfil123!', 4);
+  await prisma.user.create({
+    data: { name: email.split('@')[0], email, username: email.split('@')[0].replace(/\W/g, ''), passwordHash, role: 'CASHIER', permissions },
+  });
+  const jar = makeCookieJar();
+  const res = await request(baseUrl, jar, '/api/auth/login', { method: 'POST', body: { email, password: 'SenhaPerfil123!' } });
+  assert.equal(res.status, 200, `login de ${email} falhou: ${JSON.stringify(res.body)}`);
+  return jar;
+}
+
+test('perfis: estoque cadastra produto sem preço, financeiro recebe o aviso e libera para venda', async () => {
+  const estoque = await loginWithPermissions('estoque.perfil@example.com', ['products.manage', 'stock.manage']);
+  const financeiro = await loginWithPermissions('financeiro.perfil@example.com', ['sales.viewAll', 'sales.cancel', 'reports.view', 'prices.manage']);
+  const caixa = await loginWithPermissions('caixa.perfil@example.com', []);
+
+  // Estoque não pode mandar preço.
+  const withPrice = await request(baseUrl, estoque, '/api/products', {
+    method: 'POST', body: { name: 'Produto Com Preço do Estoque', unit: 'UN', salePrice: 5, initialStock: 3 },
+  });
+  assert.equal(withPrice.status, 403);
+
+  const created = await request(baseUrl, estoque, '/api/products', {
+    method: 'POST', body: { name: 'Produto Aguardando Preço', unit: 'UN', initialStock: 10 },
+  });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.pricePending, true);
+  assert.equal(created.body.salePrice, null);
+  assert.equal('costPrice' in created.body, false, 'estoque não vê custo');
+
+  // Ninguém vende produto sem preço.
+  const sale = await request(baseUrl, caixa, '/api/sales', {
+    method: 'POST', body: { items: [{ productId: created.body.id, quantity: 1 }] },
+  });
+  assert.equal(sale.status, 409);
+  assert.match(sale.body.error, /aguardando preço/);
+
+  // Aviso no painel: só para quem define preço.
+  const finDash = await request(baseUrl, financeiro, '/api/dashboard');
+  assert.ok(finDash.body.pricePending.some((p) => p.id === created.body.id));
+  assert.equal((await request(baseUrl, estoque, '/api/dashboard')).body.pricePending, undefined);
+  assert.equal((await request(baseUrl, caixa, '/api/dashboard')).body.pricePending, undefined);
+
+  const priced = await request(baseUrl, financeiro, `/api/products/${created.body.id}`, {
+    method: 'PUT', body: { salePrice: 6.5, costPrice: 4 },
+  });
+  assert.equal(priced.status, 200);
+  assert.equal(priced.body.pricePending, false);
+  assert.equal(priced.body.margin, 2.5);
+
+  const saleAfter = await request(baseUrl, caixa, '/api/sales', {
+    method: 'POST', body: { items: [{ productId: created.body.id, quantity: 1 }] },
+  });
+  assert.equal(saleAfter.status, 201);
+  assert.equal(saleAfter.body.totalAmount, 6.5);
+});
+
+test('perfis: cada permissão abre só a sua parte da API e vale na hora em que o dono muda', async () => {
+  const estoque = await loginWithPermissions('estoque.rotas@example.com', ['stock.manage']);
+  const financeiro = await loginWithPermissions('financeiro.rotas@example.com', ['reports.view']);
+
+  assert.equal((await request(baseUrl, estoque, '/api/stock/movements')).status, 200);
+  assert.equal((await request(baseUrl, estoque, '/api/reports/sales-summary')).status, 403);
+  assert.equal((await request(baseUrl, estoque, '/api/imports/products/template')).status, 403);
+  assert.equal((await request(baseUrl, estoque, '/api/users')).status, 403);
+
+  assert.equal((await request(baseUrl, financeiro, '/api/reports/sales-summary')).status, 200);
+  assert.equal((await request(baseUrl, financeiro, '/api/stock/movements')).status, 403);
+  assert.equal((await request(baseUrl, financeiro, '/api/users')).status, 403);
+
+  // O dono tira a permissão: a mesma sessão perde o acesso sem precisar sair.
+  const user = await prisma.user.findUnique({ where: { email: 'estoque.rotas@example.com' } });
+  const update = await request(baseUrl, adminJar, `/api/users/${user.id}`, { method: 'PUT', body: { permissions: [] } });
+  assert.equal(update.status, 200);
+  assert.deepEqual(update.body.permissions, []);
+  assert.equal((await request(baseUrl, estoque, '/api/stock/movements')).status, 403);
+
+  const invalid = await request(baseUrl, adminJar, `/api/users/${user.id}`, { method: 'PUT', body: { permissions: ['virar.dono'] } });
+  assert.equal(invalid.status, 400);
+});
+
+test('perfis: caixa cancela a própria venda só nos primeiros 10 minutos; financeiro cancela qualquer uma', async () => {
+  const caixa = await loginWithPermissions('caixa.cancela@example.com', []);
+  const outroCaixa = await loginWithPermissions('caixa.outro@example.com', []);
+  const financeiro = await loginWithPermissions('financeiro.cancela@example.com', ['sales.viewAll', 'sales.cancel']);
+
+  const product = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST', body: { name: 'Produto Cancelamento Perfil', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 20 },
+  });
+  const sell = async (jar) => (await request(baseUrl, jar, '/api/sales', {
+    method: 'POST', body: { items: [{ productId: product.body.id, quantity: 1 }] },
+  })).body.id;
+
+  const recent = await sell(caixa);
+  const list = await request(baseUrl, caixa, '/api/sales');
+  assert.equal(list.body.sales.find((s) => s.id === recent).canCancel, true);
+  assert.equal((await request(baseUrl, outroCaixa, `/api/sales/${recent}/cancel`, { method: 'POST' })).status, 403, 'outro caixa não cancela');
+  assert.equal((await request(baseUrl, caixa, `/api/sales/${recent}/cancel`, { method: 'POST' })).status, 200);
+
+  const old = await sell(caixa);
+  await prisma.sale.update({ where: { id: old }, data: { createdAt: new Date(Date.now() - 11 * 60_000) } });
+  const late = await request(baseUrl, caixa, `/api/sales/${old}/cancel`, { method: 'POST' });
+  assert.equal(late.status, 403);
+  assert.match(late.body.error, /10 minutos/);
+
+  // Financeiro vê a venda de outra pessoa e cancela mesmo depois do prazo.
+  const finList = await request(baseUrl, financeiro, '/api/sales?pageSize=100');
+  assert.ok(finList.body.sales.some((s) => s.id === old));
+  assert.equal((await request(baseUrl, financeiro, `/api/sales/${old}/cancel`, { method: 'POST' })).status, 200);
+});

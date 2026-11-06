@@ -8,6 +8,7 @@ const validate = require('../validate');
 const httpError = require('../httpError');
 const { hashPassword, verifyPassword, signToken, setAuthCookie, clearAuthCookie, authenticate } = require('../auth');
 const { generateUsername } = require('../username');
+const { effectivePermissions } = require('../permissions');
 const { buildTransport } = require('../jobs/dailyAlerts');
 
 const router = express.Router();
@@ -141,7 +142,8 @@ router.post('/auto-login', autoLoginLimiter, async (req, res) => {
   if (!user || !user.active) {
     return res.status(401).json({ error: 'Usuário de demonstração indisponível.' });
   }
-  if (user.role !== 'CASHIER') {
+  // Caixa "puro": um funcionário com permissões extras (financeiro, estoque) também é recusado.
+  if (user.role !== 'CASHIER' || user.permissions.length > 0) {
     return res.status(403).json({ error: 'Auto-login só pode usar perfil Caixa.' });
   }
 
@@ -307,10 +309,10 @@ router.post('/logout', (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.sub },
-    select: { id: true, name: true, email: true, username: true, role: true, active: true },
+    select: { id: true, name: true, email: true, username: true, role: true, permissions: true, active: true },
   });
   if (!user || !user.active) return res.status(401).json({ error: 'Não autenticado.' });
-  res.json(user);
+  res.json({ ...user, permissions: effectivePermissions(user) });
 });
 
 module.exports = router;

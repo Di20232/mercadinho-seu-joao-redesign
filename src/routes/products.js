@@ -3,8 +3,9 @@ const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
 const httpError = require('../httpError');
-const { authenticate, authorize } = require('../auth');
+const { authenticate } = require('../auth');
 const { clampIntParam } = require('../queryHelpers');
+const { can, requirePermission } = require('../permissions');
 
 const router = express.Router();
 router.use(authenticate);
@@ -29,8 +30,9 @@ const productCreateSchema = z.object({
   barcode: z.string().trim().max(64).optional().nullable(),
   category: z.string().trim().max(80).optional().nullable(),
   unit: z.string().trim().min(1).max(10).default('UN'),
-  costPrice: money,
-  salePrice: z.number().finite().positive().max(1_000_000),
+  // Opcionais: sem preço o produto fica "aguardando preço" e não pode ser vendido.
+  costPrice: money.optional().nullable(),
+  salePrice: z.number().finite().positive().max(1_000_000).optional().nullable(),
   minStock: z.number().finite().nonnegative().max(1_000_000).default(0),
   initialStock: z.number().finite().nonnegative().max(1_000_000).default(0),
   expiryDate: dateOnly.optional().nullable(),
@@ -42,32 +44,48 @@ const productCreateSchema = z.object({
 // tela — a não ser mexendo direto no banco de dados.
 const productUpdateSchema = productCreateSchema.partial().omit({ initialStock: true }).extend({ active: z.boolean().optional() });
 
-function serializeProduct(p, role) {
+const PRICE_PENDING_WHERE = { OR: [{ salePrice: null }, { costPrice: null }] };
+const isPricePending = (p) => p.salePrice === null || p.costPrice === null;
+const canEditCatalog = (user) => can(user, 'products.manage') || can(user, 'prices.manage');
+
+function serializeProduct(p, user) {
   const base = {
     id: p.id,
     name: p.name,
     barcode: p.barcode,
     category: p.category,
     unit: p.unit,
-    salePrice: Number(p.salePrice),
+    salePrice: p.salePrice === null ? null : Number(p.salePrice),
+    pricePending: isPricePending(p),
     currentStock: Number(p.currentStock),
     minStock: Number(p.minStock),
     expiryDate: p.expiryDate,
     active: p.active,
   };
-  if (role === 'ADMIN') {
-    base.costPrice = Number(p.costPrice);
-    base.margin = Number(p.salePrice) - Number(p.costPrice);
+  if (can(user, 'prices.manage')) {
+    base.costPrice = p.costPrice === null ? null : Number(p.costPrice);
+    base.margin = isPricePending(p) ? null : Number(p.salePrice) - Number(p.costPrice);
   }
   return base;
 }
 
+// Quem não define preço não pode mandar preço — nem para zerar.
+function assertCanSetPrices(req) {
+  const { body } = req;
+  if ((body.salePrice !== undefined || body.costPrice !== undefined) && !can(req.user, 'prices.manage')) {
+    throw httpError(403, 'Só o dono ou o financeiro podem definir preços.');
+  }
+}
+
+const decimalOrNull = (value, digits) => (value === null ? null : value.toFixed(digits));
+
 router.get('/', async (req, res) => {
-  const { query, category, lowStock, includeInactive } = req.query;
+  const { query, category, lowStock, includeInactive, pricePending } = req.query;
   const where = {};
-  if (!(includeInactive === 'true' && req.user.role === 'ADMIN')) where.active = true;
+  if (!(includeInactive === 'true' && canEditCatalog(req.user))) where.active = true;
   if (query) where.name = { contains: String(query), mode: 'insensitive' };
   if (category) where.category = String(category);
+  if (pricePending === 'true') Object.assign(where, PRICE_PENDING_WHERE);
 
   const paginated = req.query.page !== undefined || req.query.pageSize !== undefined;
   const page = clampIntParam(req.query.page, { min: 1, max: 1_000_000, fallback: 1 });
@@ -77,7 +95,7 @@ router.get('/', async (req, res) => {
   // Com lowStock, filtra em memória e pagina o resultado; sem ele, skip/take no banco.
   if (!paginated || lowStock === 'true') {
     const products = await prisma.product.findMany({ where, orderBy: { name: 'asc' } });
-    let result = products.map((p) => serializeProduct(p, req.user.role));
+    let result = products.map((p) => serializeProduct(p, req.user));
     if (lowStock === 'true') result = result.filter((p) => p.currentStock <= p.minStock);
     if (!paginated) return res.json(result);
     const totalCount = result.length;
@@ -94,7 +112,7 @@ router.get('/', async (req, res) => {
     }),
     prisma.product.count({ where }),
   ]);
-  res.json({ totalCount, page, pageSize, products: products.map((p) => serializeProduct(p, req.user.role)) });
+  res.json({ totalCount, page, pageSize, products: products.map((p) => serializeProduct(p, req.user)) });
 });
 
 router.get('/:id', async (req, res) => {
@@ -103,11 +121,12 @@ router.get('/:id', async (req, res) => {
   // sem esta mesma checagem aqui, bastava saber (ou adivinhar) o ID de um
   // produto descontinuado para um funcionário ver seus detalhes completos
   // por fora da tela normal — a rota de detalhe precisa impor a mesma regra.
-  if (!p || (!p.active && req.user.role !== 'ADMIN')) throw httpError(404, 'Produto não encontrado.');
-  res.json(serializeProduct(p, req.user.role));
+  if (!p || (!p.active && !canEditCatalog(req.user))) throw httpError(404, 'Produto não encontrado.');
+  res.json(serializeProduct(p, req.user));
 });
 
-router.post('/', authorize('ADMIN'), validate(productCreateSchema), async (req, res) => {
+router.post('/', requirePermission('products.manage', 'prices.manage'), validate(productCreateSchema), async (req, res) => {
+  assertCanSetPrices(req);
   const data = req.body;
 
   if (data.barcode) {
@@ -124,8 +143,8 @@ router.post('/', authorize('ADMIN'), validate(productCreateSchema), async (req, 
           barcode: data.barcode || null,
           category: data.category || null,
           unit: data.unit,
-          costPrice: data.costPrice.toFixed(2),
-          salePrice: data.salePrice.toFixed(2),
+          costPrice: decimalOrNull(data.costPrice ?? null, 2),
+          salePrice: decimalOrNull(data.salePrice ?? null, 2),
           minStock: data.minStock.toFixed(3),
           currentStock: data.initialStock.toFixed(3),
           expiryDate: data.expiryDate ? new Date(`${data.expiryDate}T00:00:00Z`) : null,
@@ -154,10 +173,11 @@ router.post('/', authorize('ADMIN'), validate(productCreateSchema), async (req, 
     throw err;
   }
 
-  res.status(201).json(serializeProduct(product, req.user.role));
+  res.status(201).json(serializeProduct(product, req.user));
 });
 
-router.put('/:id', authorize('ADMIN'), validate(productUpdateSchema), async (req, res) => {
+router.put('/:id', requirePermission('products.manage', 'prices.manage'), validate(productUpdateSchema), async (req, res) => {
+  assertCanSetPrices(req);
   const data = req.body;
   const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
   if (!existing) throw httpError(404, 'Produto não encontrado.');
@@ -176,8 +196,8 @@ router.put('/:id', authorize('ADMIN'), validate(productUpdateSchema), async (req
         ...(data.barcode !== undefined && { barcode: data.barcode || null }),
         ...(data.category !== undefined && { category: data.category || null }),
         ...(data.unit !== undefined && { unit: data.unit }),
-        ...(data.costPrice !== undefined && { costPrice: data.costPrice.toFixed(2) }),
-        ...(data.salePrice !== undefined && { salePrice: data.salePrice.toFixed(2) }),
+        ...(data.costPrice !== undefined && { costPrice: decimalOrNull(data.costPrice, 2) }),
+        ...(data.salePrice !== undefined && { salePrice: decimalOrNull(data.salePrice, 2) }),
         ...(data.minStock !== undefined && { minStock: data.minStock.toFixed(3) }),
         ...(data.expiryDate !== undefined && {
           expiryDate: data.expiryDate ? new Date(`${data.expiryDate}T00:00:00Z`) : null,
@@ -190,11 +210,11 @@ router.put('/:id', authorize('ADMIN'), validate(productUpdateSchema), async (req
     throw err;
   }
 
-  res.json(serializeProduct(product, req.user.role));
+  res.json(serializeProduct(product, req.user));
 });
 
 // Exclusão lógica: preserva o histórico de vendas/movimentações já vinculado ao produto.
-router.delete('/:id', authorize('ADMIN'), async (req, res) => {
+router.delete('/:id', requirePermission('products.manage', 'prices.manage'), async (req, res) => {
   const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
   if (!existing) throw httpError(404, 'Produto não encontrado.');
   await prisma.product.update({ where: { id: req.params.id }, data: { active: false } });

@@ -61,7 +61,7 @@ async function authenticate(req, res, next) {
   // desprezível para o volume de um sistema desse porte.
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { id: true, role: true, active: true, sessionVersion: true },
+    select: { id: true, role: true, permissions: true, active: true, sessionVersion: true },
   });
   if (!user || !user.active) {
     return res.status(401).json({ error: 'Sessão inválida ou expirada.' });
@@ -73,7 +73,8 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ error: 'Sessão inválida ou expirada.' });
   }
 
-  req.user = { sub: user.id, role: user.role };
+  // Permissões vêm do banco a cada requisição: o dono desmarca e vale na hora.
+  req.user = { sub: user.id, role: user.role, permissions: user.permissions };
   next();
 }
 

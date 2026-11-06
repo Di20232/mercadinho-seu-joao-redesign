@@ -6,14 +6,15 @@ const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
 const httpError = require('../httpError');
-const { authenticate, authorize } = require('../auth');
+const { authenticate } = require('../auth');
+const { requirePermission } = require('../permissions');
 const { applyStockDelta } = require('../stockOps');
 const { MAX_ROWS, MAX_COLUMNS, parseFile, parseDelimited } = require('../spreadsheet');
 const { FIELDS, guessMapping, normalizeRow, nameKey } = require('../productImport');
 
 const router = express.Router();
 // Importar produtos reescreve preços e saldos em massa — é ação de dono, não de caixa.
-router.use(authenticate, authorize('ADMIN'));
+router.use(authenticate, requirePermission('prices.manage'));
 
 // A grade lida da planilha volta para o servidor a cada pré-visualização (o
 // usuário pode trocar o mapeamento de colunas sem reenviar o arquivo), então

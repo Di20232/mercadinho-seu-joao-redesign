@@ -150,6 +150,11 @@ window.addEventListener('resize', debounce(moveNavIndicator, 100));
 const topbar = document.getElementById('topbar');
 window.addEventListener('scroll', () => topbar.classList.toggle('is-scrolled', window.scrollY > 4), { passive: true });
 
+// Só esconde/mostra na tela; quem barra de verdade é a API.
+function can(permission) {
+  return currentUser.permissions.includes(permission);
+}
+
 // ---------- Boot ----------
 (async () => {
   try {
@@ -161,9 +166,19 @@ window.addEventListener('scroll', () => topbar.classList.toggle('is-scrolled', w
   // Mostra o nome de usuário junto do nome: é por ele que quem acabou de se
   // cadastrar descobre o login curto que pode usar no lugar do e-mail.
   document.getElementById('user-name').textContent = currentUser.name;
-  document.getElementById('user-role').textContent = `@${currentUser.username} · ${currentUser.role === 'ADMIN' ? 'admin' : 'caixa'}`;
+  const roleLabel = currentUser.role === 'ADMIN' ? 'dono' : (currentUser.permissions.length ? 'equipe' : 'caixa');
+  document.getElementById('user-role').textContent = `@${currentUser.username} · ${roleLabel}`;
   document.getElementById('user-avatar').textContent = currentUser.name.trim().charAt(0).toUpperCase();
   document.body.classList.toggle('role-admin', currentUser.role === 'ADMIN');
+  // Classes que mostram/escondem pedaços da tela (ver [data-perm] no CSS).
+  const flags = {
+    stock: can('stock.manage'),
+    reports: can('reports.view'),
+    prices: can('prices.manage'),
+    catalog: can('products.manage') || can('prices.manage'),
+  };
+  flags.manage = flags.stock || flags.reports || flags.prices || currentUser.role === 'ADMIN';
+  Object.entries(flags).forEach(([name, on]) => document.body.classList.toggle(`can-${name}`, on));
   switchTab('dashboard');
 })();
 
@@ -218,7 +233,7 @@ function fillItemList(listId, countId, items, renderItem, empty) {
 
 async function renderDashboard() {
   activeTemplate('dashboard');
-  const isAdmin = currentUser.role === 'ADMIN';
+  const isAdmin = can('reports.view'); // vê faturamento e gráficos
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -286,6 +301,19 @@ async function renderDashboard() {
       el('span', { class: 'item-side' }, el('span', { class: `badge ${days <= 0 ? 'bad' : 'info'}` }, label)),
     ]);
   }, { icon: 'circle-check', title: 'Validades em dia', text: 'Nenhum produto vencendo em breve.' });
+
+  if (data.pricePending) {
+    fillItemList('tb-price-pending', 'count-price-pending', data.pricePending, (p) => el('li', {}, [
+      el('div', { class: 'item-main' }, [
+        el('span', { class: 'item-name' }, p.name),
+        el('span', { class: 'item-meta' }, `Cadastrado em ${formatDate(p.createdAt)}`),
+      ]),
+      el('span', { class: 'item-side' }, el('button', {
+        class: 'small secondary', type: 'button',
+        onclick: async () => openProductForm(await api.get(`/products/${p.id}`)),
+      }, [icon('pencil'), 'Definir preço'])),
+    ]), { icon: 'circle-check', title: 'Nenhum pendente', text: 'Todos os produtos já têm preço.' });
+  }
 
   if (!isAdmin) return;
 
@@ -367,7 +395,7 @@ async function renderVendas() {
       const products = await api.get(`/products?query=${encodeURIComponent(term)}`);
       if (searchInput.value.trim() !== term) return; // chegou resposta de uma busca antiga
       resultsBox.innerHTML = '';
-      results = products.slice(0, 8);
+      results = products.filter((p) => !p.pricePending).slice(0, 8);
       results.forEach((p, i) => {
         const outOfStock = p.currentStock <= 0;
         const node = el('div', { class: 'result-item', role: 'option' }, [
@@ -386,7 +414,7 @@ async function renderVendas() {
         node.addEventListener('click', () => pick(p, node));
         resultsBox.appendChild(node);
       });
-      if (products.length === 0) resultsBox.appendChild(el('div', { class: 'muted' }, 'Nenhum produto encontrado.'));
+      if (results.length === 0) resultsBox.appendChild(el('div', { class: 'muted' }, 'Nenhum produto encontrado.'));
       highlight(0);
     }, 200);
   });
@@ -593,7 +621,7 @@ async function loadRecentSales() {
       el('td', { class: 'num' }, String(s.itemCount)),
       el('td', { class: 'num' }, el('strong', {}, formatMoney(s.totalAmount))),
     ];
-    if (currentUser.role === 'ADMIN') {
+    if (s.canCancel) {
       cells.push(el('td', { class: 'td-actions' }, el('button', {
         class: 'small ghost', type: 'button',
         onclick: async () => {
@@ -689,18 +717,21 @@ function expiryBadge(value) {
 async function loadProducts() {
   const body = document.getElementById('products-list');
   if (!body) return;
-  const isAdmin = currentUser.role === 'ADMIN';
-  if (!body.children.length) skeletonRows(body, isAdmin ? 8 : 7, 6);
+  const canPrices = can('prices.manage');
+  const canCatalog = canPrices || can('products.manage');
+  if (!body.children.length) skeletonRows(body, canPrices ? 8 : 7, 6);
 
   const term = document.getElementById('product-search')?.value.trim() || '';
   const params = new URLSearchParams({ query: term, page: String(productsPage), pageSize: String(LIST_PAGE_SIZE) });
-  if (isAdmin) params.set('includeInactive', 'true');
+  if (canCatalog) params.set('includeInactive', 'true');
   if (productFilter === 'low') params.set('lowStock', 'true');
+  if (productFilter === 'pending') params.set('pricePending', 'true');
   const data = await api.get(`/products?${params.toString()}`);
   if (!document.body.contains(body)) return;
 
   const caption = document.getElementById('products-caption');
-  if (caption) caption.textContent = productFilter === 'low' ? `${data.totalCount} produto(s) abaixo do mínimo` : `${data.totalCount} produto(s) cadastrados`;
+  const captions = { low: 'abaixo do mínimo', pending: 'aguardando preço', all: 'cadastrados' };
+  if (caption) caption.textContent = `${data.totalCount} produto(s) ${captions[productFilter]}`;
 
   body.innerHTML = '';
   data.products.forEach((p) => {
@@ -716,13 +747,15 @@ async function loadProducts() {
       el('td', {}, p.category ? el('span', { class: 'badge' }, p.category) : el('span', { class: 'muted' }, '—')),
       el('td', {}, el('span', { class: `badge ${low ? 'bad' : 'ok'}` }, `${formatQuantity(p.currentStock)} ${p.unit}`)),
       el('td', { class: 'num' }, formatQuantity(p.minStock)),
-      el('td', { class: 'num' }, el('strong', {}, formatMoney(p.salePrice))),
+      el('td', { class: 'num' }, p.pricePending
+        ? el('span', { class: 'badge warn' }, 'Aguardando preço')
+        : el('strong', {}, formatMoney(p.salePrice))),
     ];
-    const costCell = el('td', { class: 'num' }, isAdmin ? formatMoney(p.costPrice) : '');
-    costCell.setAttribute('data-admin-only', '');
+    const costCell = el('td', { class: 'num' }, canPrices && p.costPrice !== null ? formatMoney(p.costPrice) : '');
+    costCell.setAttribute('data-perm', 'prices');
     cells.push(costCell);
     cells.push(el('td', {}, expiryBadge(p.expiryDate)));
-    cells.push(el('td', { class: 'td-actions' }, isAdmin
+    cells.push(el('td', { class: 'td-actions' }, canCatalog
       ? el('button', { class: 'icon-btn', type: 'button', title: 'Editar produto', 'aria-label': `Editar ${p.name}`, onclick: () => openProductForm(p) }, icon('pencil'))
       : null));
     body.appendChild(el('tr', { class: p.active ? '' : 'is-inactive' }, cells));
@@ -778,7 +811,7 @@ function openProductForm(product) {
     document.getElementById('p-category').value = product.category || '';
     document.getElementById('p-barcode').value = product.barcode || '';
     document.getElementById('p-unit').value = product.unit;
-    document.getElementById('p-sale-price').value = product.salePrice;
+    document.getElementById('p-sale-price').value = product.salePrice ?? '';
     document.getElementById('p-cost-price').value = product.costPrice ?? '';
     document.getElementById('p-min-stock').value = product.minStock;
     document.getElementById('p-expiry').value = product.expiryDate ? product.expiryDate.slice(0, 10) : '';
@@ -817,6 +850,11 @@ function openProductForm(product) {
     }
   }
 
+  // Sem permissão de preço os campos ficam escondidos e não podem travar o envio.
+  const canPrices = can('prices.manage');
+  document.getElementById('p-sale-price').required = canPrices;
+  document.getElementById('p-cost-price').required = canPrices;
+
   document.getElementById('p-sale-price').addEventListener('input', updateMarginPreview);
   document.getElementById('p-cost-price').addEventListener('input', updateMarginPreview);
   updateMarginPreview();
@@ -836,12 +874,14 @@ function openProductForm(product) {
       category: document.getElementById('p-category').value || null,
       barcode: document.getElementById('p-barcode').value || null,
       unit: document.getElementById('p-unit').value,
-      salePrice: parseFloat(document.getElementById('p-sale-price').value),
-      costPrice: parseFloat(document.getElementById('p-cost-price').value),
       minStock: parseFloat(document.getElementById('p-min-stock').value || '0'),
       expiryDate: document.getElementById('p-expiry').value || null,
     };
     if (!isEdit) payload.initialStock = parseFloat(document.getElementById('p-initial-stock').value || '0');
+    if (canPrices) {
+      payload.salePrice = parseFloat(document.getElementById('p-sale-price').value);
+      payload.costPrice = parseFloat(document.getElementById('p-cost-price').value);
+    }
 
     setButtonLoading(saveBtn, true);
     try {
@@ -849,7 +889,8 @@ function openProductForm(product) {
       else await api.post('/products', payload);
       closeModal(modal);
       toast(isEdit ? 'Produto atualizado.' : `"${payload.name}" cadastrado.`);
-      await loadProducts();
+      if (document.getElementById('products-list')) await loadProducts();
+      else if (document.getElementById('tb-price-pending')) renderDashboard();
     } catch (err) {
       setButtonLoading(saveBtn, false);
       msg.textContent = err.message;
@@ -1443,9 +1484,20 @@ async function loadReports() {
 }
 
 // ---------- Usuários ----------
+let permCatalog = { permissions: {}, templates: {} }; // caixinhas e modelos vindos da API
+
+// Nome do tipo de pessoa: o modelo cujas permissões batem exatamente, senão "Personalizado".
+function profileLabel(user) {
+  if (user.role === 'ADMIN') return 'Dono';
+  const mine = [...user.permissions].sort().join();
+  const match = Object.values(permCatalog.templates).find((t) => [...t.permissions].sort().join() === mine);
+  return match ? match.label : 'Personalizado';
+}
+
 async function renderUsuarios() {
   activeTemplate('usuarios');
   document.getElementById('new-user-btn').addEventListener('click', () => openUserForm(null));
+  permCatalog = await api.get('/users/permissions');
   await loadUsers();
 }
 
@@ -1471,7 +1523,7 @@ async function loadUsers() {
       ])),
       el('td', {}, el('span', { class: 'muted' }, `@${u.username}`)),
       el('td', {}, u.email),
-      el('td', {}, el('span', { class: `badge ${u.role === 'ADMIN' ? 'info' : ''}` }, u.role === 'ADMIN' ? 'Administrador' : 'Funcionário')),
+      el('td', {}, el('span', { class: `badge ${u.role === 'ADMIN' ? 'info' : ''}` }, profileLabel(u))),
       el('td', {}, el('span', { class: `badge ${u.active ? 'ok' : 'bad'}` }, u.active ? 'Ativo' : 'Inativo')),
       el('td', { class: 'td-actions' }, el('button', {
         class: 'icon-btn', type: 'button', title: 'Editar usuário', 'aria-label': `Editar ${u.name}`, onclick: () => openUserForm(u),
@@ -1487,7 +1539,7 @@ function openUserForm(user) {
   const isEdit = Boolean(user);
 
   document.getElementById('user-form-title').textContent = isEdit ? 'Editar usuário' : 'Novo usuário';
-  document.getElementById('user-form-sub').textContent = isEdit ? `@${user.username} · ${user.email}` : 'A conta entra como funcionário (caixa).';
+  document.getElementById('user-form-sub').textContent = isEdit ? `@${user.username} · ${user.email}` : 'Escolha o tipo de pessoa e ajuste as permissões.';
   document.getElementById('u-email-field').hidden = isEdit;
   document.getElementById('u-email').required = !isEdit;
   document.getElementById('u-active-label').hidden = !isEdit;
@@ -1501,6 +1553,35 @@ function openUserForm(user) {
     document.getElementById('u-name').value = user.name;
     document.getElementById('u-active').checked = user.active;
   }
+
+  // Dono tem tudo: não há o que marcar.
+  const isOwner = isEdit && user.role === 'ADMIN';
+  document.getElementById('u-perms-block').hidden = isOwner;
+  const permBox = document.getElementById('u-perms');
+  const boxes = Object.entries(permCatalog.permissions).map(([key, label]) => {
+    const input = el('input', { type: 'checkbox', value: key });
+    input.checked = isEdit ? user.permissions.includes(key) : false;
+    permBox.appendChild(el('label', { class: 'switch' }, [input, label]));
+    return input;
+  });
+  const templateBox = document.getElementById('u-template');
+  const syncTemplate = () => {
+    const label = profileLabel({ role: 'CASHIER', permissions: boxes.filter((b) => b.checked).map((b) => b.value) });
+    templateBox.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.textContent === label));
+  };
+  Object.values(permCatalog.templates).forEach((t) => {
+    templateBox.appendChild(el('button', {
+      type: 'button',
+      onclick: () => {
+        boxes.forEach((b) => { b.checked = t.permissions.includes(b.value); });
+        syncTemplate();
+      },
+    }, t.label));
+  });
+  boxes.forEach((b) => b.addEventListener('change', syncTemplate));
+  if (!isEdit) templateBox.querySelector('button:last-child')?.click(); // conta nova começa como Caixa
+  syncTemplate();
+  const checkedPermissions = () => boxes.filter((b) => b.checked).map((b) => b.value);
 
   document.getElementById('user-cancel-btn').addEventListener('click', () => closeModal(modal));
   document.getElementById('user-close-btn').addEventListener('click', () => closeModal(modal));
@@ -1522,12 +1603,14 @@ function openUserForm(user) {
           active: document.getElementById('u-active').checked,
         };
         if (password) payload.password = password;
+        if (!isOwner) payload.permissions = checkedPermissions();
         await api.put(`/users/${user.id}`, payload);
       } else {
         await api.post('/users', {
           name: document.getElementById('u-name').value,
           email: document.getElementById('u-email').value,
           password,
+          permissions: checkedPermissions(),
         });
       }
       closeModal(modal);

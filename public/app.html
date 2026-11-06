@@ -22,10 +22,10 @@
         <button data-tab="dashboard" class="tab-btn active" title="Painel"><svg class="icon"><use href="#i-layout-dashboard" /></svg><span>Painel</span></button>
         <button data-tab="vendas" class="tab-btn" title="Vendas"><svg class="icon"><use href="#i-shopping-cart" /></svg><span>Vendas</span></button>
         <button data-tab="produtos" class="tab-btn" title="Produtos"><svg class="icon"><use href="#i-package" /></svg><span>Produtos</span></button>
-        <p class="nav-section" data-admin-only>Gestão</p>
-        <button data-tab="estoque" class="tab-btn" title="Estoque" data-admin-only><svg class="icon"><use href="#i-warehouse" /></svg><span>Estoque</span></button>
-        <button data-tab="importar" class="tab-btn" title="Importar" data-admin-only><svg class="icon"><use href="#i-file-up" /></svg><span>Importar</span></button>
-        <button data-tab="relatorios" class="tab-btn" title="Relatórios" data-admin-only><svg class="icon"><use href="#i-chart-column" /></svg><span>Relatórios</span></button>
+        <p class="nav-section" data-perm="manage">Gestão</p>
+        <button data-tab="estoque" class="tab-btn" title="Estoque" data-perm="stock"><svg class="icon"><use href="#i-warehouse" /></svg><span>Estoque</span></button>
+        <button data-tab="importar" class="tab-btn" title="Importar" data-perm="prices"><svg class="icon"><use href="#i-file-up" /></svg><span>Importar</span></button>
+        <button data-tab="relatorios" class="tab-btn" title="Relatórios" data-perm="reports"><svg class="icon"><use href="#i-chart-column" /></svg><span>Relatórios</span></button>
         <button data-tab="usuarios" class="tab-btn" title="Usuários" data-admin-only><svg class="icon"><use href="#i-users" /></svg><span>Usuários</span></button>
       </nav>
 
@@ -73,7 +73,16 @@
         <div class="kpi is-loading"><div class="kpi-top"><div class="skeleton skeleton-line w-40"></div><span class="kpi-icon"></span></div><div class="skeleton skeleton-value"></div><div class="skeleton skeleton-line w-60"></div></div>
       </div>
 
-      <div class="dash-grid" id="admin-charts" data-admin-only>
+      <div class="card reveal" id="card-price-pending" data-perm="prices" data-tone="warn">
+        <div class="card-head">
+          <span class="card-icon"><svg class="icon"><use href="#i-circle-alert" /></svg></span>
+          <div><h3>Aguardando preço</h3><p class="muted">Cadastrados pelo estoque. Defina o preço de custo e de venda para liberar no caixa.</p></div>
+          <span class="count-pill" id="count-price-pending">0</span>
+        </div>
+        <ul class="item-list" id="tb-price-pending"></ul>
+      </div>
+
+      <div class="dash-grid" id="admin-charts" data-perm="reports">
         <div class="card reveal">
           <div class="card-head">
             <span class="card-icon"><svg class="icon"><use href="#i-trending-up" /></svg></span>
@@ -118,7 +127,7 @@
         </div>
       </div>
 
-      <div class="card reveal" id="card-slow-moving" data-admin-only>
+      <div class="card reveal" id="card-slow-moving" data-perm="reports">
         <div class="card-head">
           <span class="card-icon"><svg class="icon"><use href="#i-package-x" /></svg></span>
           <div><h3>Produtos parados</h3><p class="muted">Sem venda nos últimos 60 dias</p></div>
@@ -191,8 +200,9 @@
         <div class="segmented" id="product-filter" role="group" aria-label="Filtrar produtos">
           <button type="button" class="active" data-filter="all">Todos</button>
           <button type="button" data-filter="low">Estoque baixo</button>
+          <button type="button" data-filter="pending" data-perm="catalog">Aguardando preço</button>
         </div>
-        <button id="new-product-btn" class="push-right" type="button" data-admin-only><svg class="icon"><use href="#i-plus" /></svg>Novo produto</button>
+        <button id="new-product-btn" class="push-right" type="button" data-perm="catalog"><svg class="icon"><use href="#i-plus" /></svg>Novo produto</button>
       </div>
       <div class="card reveal">
         <div class="card-head">
@@ -200,7 +210,7 @@
           <div><h3>Catálogo</h3><p class="muted" id="products-caption">Carregando…</p></div>
         </div>
         <div class="table-wrap"><table class="table">
-          <thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Mín.</th><th>Preço</th><th data-admin-only>Custo</th><th>Validade</th><th></th></tr></thead>
+          <thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Mín.</th><th>Preço</th><th data-perm="prices">Custo</th><th>Validade</th><th></th></tr></thead>
           <tbody id="products-list"></tbody>
         </table></div>
         <div id="products-pager" class="pager" hidden></div>
@@ -220,9 +230,10 @@
         <div class="span-2"><label for="p-name">Nome</label><input id="p-name" required maxlength="150" placeholder="Ex: Arroz Branco 5kg" /></div>
         <div><label for="p-category">Categoria</label><input id="p-category" maxlength="80" placeholder="Ex: Mercearia" list="p-category-list" /><datalist id="p-category-list"></datalist></div>
         <div><label for="p-barcode">Código de barras <span class="muted">(opcional)</span></label><input id="p-barcode" maxlength="64" inputmode="numeric" /></div>
-        <div><label for="p-sale-price">Preço de venda</label><div class="input-prefix"><span>R$</span><input id="p-sale-price" type="number" step="0.01" min="0.01" required /></div></div>
-        <div><label for="p-cost-price">Preço de custo</label><div class="input-prefix"><span>R$</span><input id="p-cost-price" type="number" step="0.01" min="0" required /></div></div>
-        <div class="span-2"><div class="margin-preview" id="p-margin"><span>Margem por unidade</span><strong>—</strong></div></div>
+        <p class="span-2 hint" data-perm-hide="prices">O preço de custo e de venda é definido pelo dono ou pelo financeiro. Até lá o produto fica "aguardando preço" e não aparece no caixa.</p>
+        <div data-perm="prices"><label for="p-sale-price">Preço de venda</label><div class="input-prefix"><span>R$</span><input id="p-sale-price" type="number" step="0.01" min="0.01" required /></div></div>
+        <div data-perm="prices"><label for="p-cost-price">Preço de custo</label><div class="input-prefix"><span>R$</span><input id="p-cost-price" type="number" step="0.01" min="0" required /></div></div>
+        <div class="span-2" data-perm="prices"><div class="margin-preview" id="p-margin"><span>Margem por unidade</span><strong>—</strong></div></div>
         <div><label for="p-unit">Unidade</label><input id="p-unit" value="UN" maxlength="10" required /></div>
         <div><label for="p-expiry">Validade <span class="muted">(opcional)</span></label><input id="p-expiry" type="date" /></div>
         <div><label for="p-min-stock">Estoque mínimo</label><input id="p-min-stock" type="number" step="0.001" min="0" value="0" /><span class="hint">Abaixo disso o produto entra nos alertas.</span></div>
@@ -501,7 +512,7 @@
   <template id="tpl-usuarios">
     <section>
       <div class="toolbar">
-        <p class="muted">Quem pode entrar no sistema e com qual perfil. Contas novas entram como funcionário (caixa).</p>
+        <p class="muted">Quem pode entrar no sistema e o que cada pessoa pode fazer. Todos podem vender.</p>
         <button id="new-user-btn" class="push-right" type="button"><svg class="icon"><use href="#i-user-plus" /></svg>Novo usuário</button>
       </div>
       <div class="card reveal">
@@ -521,7 +532,7 @@
     <form id="user-form" class="card" novalidate>
       <div class="modal-head">
         <span class="card-icon"><svg class="icon"><use href="#i-user" /></svg></span>
-        <div><h3 id="user-form-title">Novo usuário</h3><p class="muted" id="user-form-sub">A conta entra como funcionário (caixa).</p></div>
+        <div><h3 id="user-form-title">Novo usuário</h3><p class="muted" id="user-form-sub">Escolha o tipo de pessoa e ajuste as permissões.</p></div>
         <button type="button" class="icon-btn modal-close" id="user-close-btn" aria-label="Fechar"><svg class="icon"><use href="#i-x" /></svg></button>
       </div>
       <input type="hidden" id="u-id" />
@@ -541,6 +552,11 @@
       </div>
       <div class="strength" id="u-strength" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
       <span class="strength-label" id="u-strength-label"></span>
+      <div id="u-perms-block">
+        <label>Tipo de pessoa</label>
+        <div class="segmented" id="u-template" role="group" aria-label="Tipo de pessoa"></div>
+        <fieldset class="perm-list" id="u-perms"><legend class="hint">Pode fazer (além de vender):</legend></fieldset>
+      </div>
       <label class="switch" id="u-active-label" for="u-active"><input id="u-active" type="checkbox" checked />Conta ativa (pode entrar no sistema)</label>
       <p id="user-form-msg" class="error" hidden></p>
       <div class="form-actions">
