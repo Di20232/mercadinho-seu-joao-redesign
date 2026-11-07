@@ -1353,6 +1353,7 @@ async function renderRelatorios() {
   });
   ['rep-from', 'rep-to'].forEach((id) => document.getElementById(id).addEventListener('change', () => setSegmented('rep-presets', null)));
   document.getElementById('rep-apply-btn').addEventListener('click', loadReports);
+  document.getElementById('rep-email-btn').addEventListener('click', openReportEmail);
   await loadReports();
 }
 
@@ -1481,6 +1482,38 @@ async function loadReports() {
   const slowChip = document.getElementById('rep-slow-total');
   slowChip.classList.toggle('has-items', slowMoving.length > 0);
   animateValue(slowChip, slowTotal, (v) => `${formatMoney(v)} parado`);
+}
+
+// Envia o relatório do período que está na tela (De/Até) para o e-mail digitado.
+function openReportEmail() {
+  const from = document.getElementById('rep-from').value;
+  const to = document.getElementById('rep-to').value;
+  const modal = openModal('tpl-report-email');
+  const input = document.getElementById('report-email-to');
+  input.value = currentUser.email;
+  document.getElementById('report-email-sub').textContent = from || to
+    ? `Período: ${from ? formatDate(`${from}T12:00:00`) : 'início'} a ${to ? formatDate(`${to}T12:00:00`) : 'hoje'}`
+    : 'Período: todo o histórico';
+  document.getElementById('report-email-close').addEventListener('click', () => closeModal(modal));
+  document.getElementById('report-email-cancel').addEventListener('click', () => closeModal(modal));
+
+  document.getElementById('report-email-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!e.target.checkValidity()) { e.target.reportValidity(); return; }
+    const msg = document.getElementById('report-email-msg');
+    const btn = document.getElementById('report-email-send');
+    msg.hidden = true;
+    setButtonLoading(btn, true);
+    try {
+      await api.post('/reports/email', { email: input.value, from: from || undefined, to: to || undefined });
+      closeModal(modal);
+      toast(`Relatório enviado para ${input.value}.`);
+    } catch (err) {
+      setButtonLoading(btn, false);
+      msg.textContent = err.message;
+      msg.hidden = false;
+    }
+  });
 }
 
 // ---------- Usuários ----------

@@ -24,18 +24,34 @@ function formatCsvValue(value) {
   return sanitizeCsvCell(value);
 }
 
+// Campo com ";", aspas ou quebra de linha vai entre aspas (RFC 4180); sem isso
+// um "NF 1234; fornecedor X" desloca as colunas da linha inteira.
+function quoteCsv(str) {
+  return /[;"\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
 function generateCsv(headers, rows) {
   const lines = [];
-  lines.push(headers.map(sanitizeCsvCell).join(';'));
+  lines.push(headers.map((h) => quoteCsv(sanitizeCsvCell(h))).join(';'));
   for (const row of rows) {
-    lines.push(row.map(formatCsvValue).join(';'));
+    lines.push(row.map((v) => quoteCsv(formatCsvValue(v))).join(';'));
   }
   // UTF-8 with BOM
   return '﻿' + lines.join('\r\n');
 }
 
 async function generateXlsx(sheetName, headers, rows) {
+  return generateWorkbook([{ name: sheetName, headers, rows }]);
+}
+
+// Um arquivo com várias abas: [{ name, headers, rows }], cada aba no mesmo estilo.
+async function generateWorkbook(sheets) {
   const workbook = new ExcelJS.Workbook();
+  for (const { name, headers, rows } of sheets) addSheet(workbook, name, headers, rows);
+  return workbook.xlsx.writeBuffer();
+}
+
+function addSheet(workbook, sheetName, headers, rows) {
   const sheet = workbook.addWorksheet(sheetName || 'Relatório');
 
   // Add header
@@ -74,9 +90,6 @@ async function generateXlsx(sheetName, headers, rows) {
     });
     column.width = Math.min(Math.max(maxLength + 3, 12), 50);
   });
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return buffer;
 }
 
-module.exports = { generateCsv, generateXlsx };
+module.exports = { generateCsv, generateXlsx, generateWorkbook };
