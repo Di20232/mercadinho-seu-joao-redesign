@@ -458,6 +458,7 @@
             <div><label for="rep-from">De</label><input id="rep-from" type="date" /></div>
             <div><label for="rep-to">Até</label><input id="rep-to" type="date" /></div>
             <button id="rep-apply-btn" type="button" class="secondary">Aplicar</button>
+            <button id="rep-email-btn" type="button"><svg class="icon"><use href="#i-mail" /></svg>Enviar por e-mail</button>
           </div>
         </div>
       </div>
@@ -526,6 +527,24 @@
         </table></div>
       </div>
     </section>
+  </template>
+
+  <template id="tpl-report-email">
+    <form id="report-email-form" class="card" novalidate>
+      <div class="modal-head">
+        <span class="card-icon"><svg class="icon"><use href="#i-mail" /></svg></span>
+        <div><h3>Enviar relatório por e-mail</h3><p class="muted" id="report-email-sub"></p></div>
+        <button type="button" class="icon-btn modal-close" id="report-email-close" aria-label="Fechar"><svg class="icon"><use href="#i-x" /></svg></button>
+      </div>
+      <label for="report-email-to">Enviar para</label>
+      <div class="field"><svg class="icon"><use href="#i-mail" /></svg><input id="report-email-to" type="email" required maxlength="255" placeholder="pessoa@email.com" /></div>
+      <span class="hint">Vai um resumo no corpo do e-mail e um Excel com vendas por dia, mais vendidos, produtos parados e previsão de estoque.</span>
+      <p id="report-email-msg" class="error" hidden></p>
+      <div class="form-actions">
+        <button type="submit" id="report-email-send"><svg class="icon"><use href="#i-mail" /></svg>Enviar</button>
+        <button type="button" id="report-email-cancel" class="secondary">Cancelar</button>
+      </div>
+    </form>
   </template>
 
   <template id="tpl-user-form">

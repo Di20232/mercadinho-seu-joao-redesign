@@ -75,6 +75,10 @@ router.post('/adjustments', validate(adjustmentSchema), async (req, res) => {
 });
 
 const MOVEMENT_TYPES = ['ENTRY', 'SALE', 'ADJUSTMENT', 'LOSS'];
+const TYPE_LABELS = { ENTRY: 'Entrada', SALE: 'Venda', ADJUSTMENT: 'Ajuste', LOSS: 'Perda' };
+// Exportar tudo (164 mil linhas) levou 34 s e 1,1 GB, travando o site para todos;
+// 20 mil levam ~3 s. Acima disso a planilha avisa que está cortada.
+const EXPORT_LIMIT = 20_000;
 
 async function sendExport(res, format, filenamePrefix, sheetName, headers, rows) {
   const fmt = (format || 'csv').toLowerCase();
@@ -158,24 +162,26 @@ router.get('/movements/export', async (req, res) => {
   if (to) where.createdAt.lte = to;
 
   const include = { product: { select: { name: true } }, user: { select: { name: true } } };
-  const movements = await prisma.stockMovement.findMany({
-    where,
-    include,
-    orderBy: { createdAt: 'desc' },
-    take: 1000,
-  });
+  const [movements, total] = await Promise.all([
+    prisma.stockMovement.findMany({ where, include, orderBy: { createdAt: 'desc' }, take: EXPORT_LIMIT }),
+    prisma.stockMovement.count({ where }),
+  ]);
 
   const headers = ['Data/Hora', 'Produto', 'Tipo', 'Quantidade', 'Estoque Anterior', 'Novo Estoque', 'Motivo', 'Usuário'];
   const rows = movements.map((m) => [
     m.createdAt,
     m.product.name,
-    m.type,
+    TYPE_LABELS[m.type] || m.type,
     Number(m.quantity),
     Number(m.previousStock),
     Number(m.newStock),
     m.reason || '',
     m.user.name,
   ]);
+  // Cortar sem avisar faria a pessoa achar que tem o histórico inteiro.
+  if (total > EXPORT_LIMIT) {
+    rows.push([`ATENÇÃO: mostrando as ${EXPORT_LIMIT.toLocaleString('pt-BR')} movimentações mais recentes de ${total.toLocaleString('pt-BR')}. Filtre por tipo ou período para ver o restante.`]);
+  }
 
   const dateStr = new Date().toISOString().slice(0, 10);
   await sendExport(res, req.query.format, `movimentacoes-estoque_${dateStr}`, 'Movimentações de Estoque', headers, rows);

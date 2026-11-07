@@ -16,7 +16,7 @@
     "simulate:sales": "node prisma/simulateSales.js",
     "simulate:history": "node prisma/simulateHistory.js",
     "reset-password": "node prisma/resetPassword.js",
-    "test": "node --test test/integration.test.js test/retryStaleRead.test.js test/historyGenerator.test.js",
+    "test": "node --test test/integration.test.js test/retryStaleRead.test.js test/historyGenerator.test.js test/exportService.test.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
