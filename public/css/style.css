@@ -1266,6 +1266,18 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
 }
 .auth-note code { font-size: 0.78rem; background: var(--surface-3); padding: 1px 5px; border-radius: 4px; }
 
+/* ---------- Sem conexão (app instalado) ---------- */
+
+.offline-page {
+  min-height: 100vh; max-width: 420px; margin: 0 auto; padding: 32px 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; text-align: center;
+}
+.offline-logo { border-radius: 18px; box-shadow: var(--shadow-sm); margin-bottom: 8px; }
+.offline-page h1 { margin: 0; font-size: 1.5rem; }
+.offline-page p { margin: 0 0 12px; color: var(--text-muted); }
+.offline-retry { min-height: 48px; padding: 0 24px; }
+
 /* ---------- Animações ---------- */
 
 @keyframes spin { to { transform: rotate(360deg); } }
