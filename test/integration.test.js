@@ -1046,3 +1046,74 @@ test('perfis: caixa cancela a própria venda só nos primeiros 10 minutos; finan
   assert.ok(finList.body.sales.some((s) => s.id === old));
   assert.equal((await request(baseUrl, financeiro, `/api/sales/${old}/cancel`, { method: 'POST' })).status, 200);
 });
+
+// "Já cadastrado": as rotas usam a regra única de src/uniqueError.js. Estes
+// testes fixam o status e a mensagem que o usuário vê em cada cadastro.
+test('já cadastrado: código de barras repetido retorna 409 ao cadastrar e ao editar produto', async () => {
+  const first = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Duplicado A', barcode: '7890000000991', unit: 'UN', costPrice: 1, salePrice: 2 },
+  });
+  assert.equal(first.status, 201);
+
+  const dupCreate = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Duplicado B', barcode: '7890000000991', unit: 'UN', costPrice: 1, salePrice: 2 },
+  });
+  assert.equal(dupCreate.status, 409);
+  assert.equal(dupCreate.body.error, 'Já existe um produto com este código de barras.');
+
+  const other = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Duplicado C', barcode: '7890000000992', unit: 'UN', costPrice: 1, salePrice: 2 },
+  });
+  const dupUpdate = await request(baseUrl, adminJar, `/api/products/${other.body.id}`, {
+    method: 'PUT',
+    body: { barcode: '7890000000991' },
+  });
+  assert.equal(dupUpdate.status, 409);
+  assert.equal(dupUpdate.body.error, 'Já existe um produto com este código de barras.');
+});
+
+test('já cadastrado: e-mail repetido retorna 409 no cadastro público e na tela de usuários', async () => {
+  const dupRegister = await request(baseUrl, makeCookieJar(), '/api/auth/register', {
+    method: 'POST',
+    body: { name: 'Admin Repetido', email: 'admin.test@example.com', password: 'SenhaRepetida123!' },
+  });
+  assert.equal(dupRegister.status, 409);
+  assert.equal(
+    dupRegister.body.error,
+    'Já existe um usuário com este e-mail. Faça login ou solicite recuperação de senha.',
+  );
+
+  const dupUser = await request(baseUrl, adminJar, '/api/users', {
+    method: 'POST',
+    body: { name: 'Admin Repetido', email: 'ADMIN.TEST@example.com', password: 'SenhaRepetida123!' },
+  });
+  assert.equal(dupUser.status, 409);
+  assert.equal(dupUser.body.error, 'Já existe um usuário com este e-mail.');
+});
+
+test('já cadastrado: corrida entre duas gravações (P2002) vira 409 e outros erros passam intactos', async () => {
+  const { guardUnique, isUniqueViolation } = require('../src/uniqueError');
+
+  const race = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+  await assert.rejects(
+    guardUnique(async () => {
+      throw race;
+    }, 'Mensagem de duplicado.'),
+    (err) => err.status === 409 && err.message === 'Mensagem de duplicado.',
+  );
+
+  const other = Object.assign(new Error('Falha qualquer'), { code: 'P2025' });
+  await assert.rejects(
+    guardUnique(async () => {
+      throw other;
+    }, 'Mensagem de duplicado.'),
+    (err) => err === other,
+  );
+
+  assert.equal(await guardUnique(async () => 'gravado', 'x'), 'gravado');
+  assert.equal(isUniqueViolation(race), true);
+  assert.equal(isUniqueViolation(null), false);
+});

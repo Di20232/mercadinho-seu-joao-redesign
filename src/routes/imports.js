@@ -6,6 +6,7 @@ const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
 const httpError = require('../httpError');
+const { DUPLICATE, isUniqueViolation } = require('../uniqueError');
 const { authenticate } = require('../auth');
 const { requirePermission } = require('../permissions');
 const { applyStockDelta } = require('../stockOps');
@@ -351,7 +352,7 @@ router.post('/products/commit', validate(gridSchema), async (req, res) => {
         // P2002 = violação de chave única; a análise já barra os casos
         // previsíveis, mas outra sessão pode ter cadastrado o mesmo código
         // de barras entre a conferência e a confirmação.
-        error: err.code === 'P2002' ? 'Código de barras já cadastrado em outro produto.' : err.message || 'Falha ao gravar.',
+        error: isUniqueViolation(err) ? DUPLICATE.importBarcode : err.message || 'Falha ao gravar.',
       });
     }
   }
