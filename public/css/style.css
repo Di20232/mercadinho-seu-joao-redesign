@@ -339,6 +339,8 @@ button.btn-block { width: 100%; }
   background: transparent; color: var(--text-muted);
   border: 1px solid transparent; box-shadow: none;
   width: 38px; height: 38px; padding: 0; border-radius: var(--radius-sm);
+  /* Sem isto, numa barra apertada o flex espremia o botão do menu até 21px. */
+  flex-shrink: 0;
 }
 .icon-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
 .icon-btn .icon { width: 19px; height: 19px; }
@@ -1354,7 +1356,8 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
 }
 
 /* Celular: nada passa da largura da tela e todo alvo de toque tem ao menos
-   40px de altura (os filtros e botões pequenos tinham 29px). */
+   48px, como pede o RNF02 (os filtros e botões pequenos tinham 29px, e os
+   botões comuns, 38–39px). */
 @media (max-width: 600px) {
   .filter-bar > div { width: 100%; }
   .filter-bar .date-range { flex-wrap: wrap; }
@@ -1362,11 +1365,26 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   .filter-bar .date-range input { width: 100%; }
   .filter-bar .date-range button { flex: 1 1 100%; }
 
-  .segmented button,
-  button.small,
+  /* Em 360px o botão "Planilha" dos relatórios passava 2px da tela: o
+     cabeçalho do cartão agora quebra a linha em vez de vazar. */
+  .card-head { flex-wrap: wrap; }
+  .card-actions { flex-wrap: wrap; }
+
+  button,
   a.btn,
-  .pager button { min-height: 40px; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select { min-height: 48px; }
+  .icon-btn { width: 48px; height: 48px; }
   .segmented button { padding-left: 14px; padding-right: 14px; }
+
+  /* Com os ícones em 48px, o título da barra ficava com 92px em 360px e
+     "Relatórios" não cabia. Espaços menores, ícones da barra com 44px de
+     largura (a altura continua 48px) e título um pouco menor. */
+  .topbar { gap: 8px; }
+  .topbar-actions { gap: 2px; }
+  .user-chip { margin-left: 2px; }
+  .topbar .icon-btn { width: 44px; }
+  .topbar-title h1 { font-size: 1.2rem; }
 
   /* Coluna de ações (editar, cancelar, remover) fica presa à direita, para
      não depender de rolar a tabela até o fim. */
@@ -1381,8 +1399,8 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   .kpi-grid, .stat-cards { grid-template-columns: 1fr; }
 
   /* Telas de conta: links de texto e o olho da senha ficavam com 17–28px. */
-  .link-action { display: inline-flex; align-items: center; min-height: 40px; }
-  .field-action { min-width: 36px; min-height: 36px; justify-content: center; align-items: center; }
+  .link-action { display: inline-flex; align-items: center; min-height: 48px; }
+  .field-action { min-width: 48px; min-height: 48px; justify-content: center; align-items: center; }
 }
 
 /* ---------- Impressão do comprovante ---------- */
