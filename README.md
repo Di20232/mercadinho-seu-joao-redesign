@@ -170,19 +170,14 @@ docker-compose.yml      # Composição de containers
 
 ## 🧪 Testes
 
-### Executar testes de segurança
+### Executar os testes
 ```bash
 npm test
 ```
 
-### Testes disponíveis (7 total)
-- ✅ JWT: signToken inclui issuer e audience
-- ✅ JWT: verificação falha com issuer inválido
-- ✅ JWT: verificação falha com audience inválida
-- ✅ JWT: algoritmo inválido é rejeitado
-- ✅ CORS: app.js importa cors corretamente
-- ✅ CORS: configuração permite origens do allowlist
-- ✅ Sales: app.js calcula preço do servidor, não do cliente
+Roda as duas suítes (`test/integration.test.js` e `test/security.test.js`), com 48 testes. A suíte de integração **apaga todas as tabelas** antes de rodar e se recusa a rodar se o nome do banco em `DATABASE_URL` não contiver `test`. Aponte para um banco só de testes, por exemplo `.../mercadinho_joao_test`.
+
+O que é coberto: login e sessão, CSRF e CORS, vendas e estoque (inclusive vendas simultâneas), cancelamento, permissões de dono e caixa, recuperação de senha, importação e exportação de planilhas, relatórios, "já cadastrado" (e-mail e código de barras), JWT e a configuração exigida em produção.
 
 ## 🔐 Segurança - Implementações
 
@@ -260,6 +255,12 @@ JWT_EXPIRES_IN=8h
 # CORS
 CLIENT_ORIGIN=http://localhost:3000
 
+# Endereço público (link do e-mail de "esqueci minha senha"); obrigatório em produção
+APP_BASE_URL=http://localhost:3000
+
+# Proxies confiáveis na frente do app (1 no Render/Railway, 0 local)
+TRUST_PROXY=0
+
 # Cookies
 COOKIE_SECURE=false
 
@@ -294,6 +295,50 @@ docker-compose logs -f db
 ```bash
 docker-compose down
 ```
+
+## ✉️ E-mail de "esqueci minha senha"
+
+O código já envia o e-mail; basta configurar o SMTP no `.env`. Com o Gmail:
+
+1. Ative a verificação em duas etapas na conta Google que vai enviar.
+2. Em *Conta Google → Segurança → Senhas de app*, crie uma senha de app (16 letras).
+3. Preencha no `.env`:
+   ```bash
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=conta.que.envia@gmail.com
+   SMTP_PASS=a-senha-de-app
+   SMTP_FROM="Mercadinho do João <conta.que.envia@gmail.com>"
+   ALERT_EMAIL_TO=dono@exemplo.com   # opcional: recebe o alerta diário de estoque
+   ```
+4. Reinicie o servidor, abra *Esqueci minha senha* e informe um e-mail cadastrado.
+
+Sem SMTP, fora de produção, o link aparece no log do servidor (`[forgot-password] link de reset...`). A resposta da tela é sempre a mesma mensagem genérica, exista ou não o e-mail.
+
+## ☁️ Publicando na nuvem
+
+Use o modo **Node** do provedor, não o `Dockerfile`: o `Dockerfile` foi feito para o `docker-compose` e espera um banco com o nome `db`, que não existe na nuvem.
+
+1. **Banco (Neon ou Supabase):** crie um projeto PostgreSQL e copie a string de conexão **direta** (sem pooler). Ela vai em `DATABASE_URL`, com `?sslmode=require` no fim se o provedor não colocar.
+2. **App (Render ou Railway):** crie um serviço web a partir do repositório.
+   - Build: `npm ci --include=dev && npx prisma migrate deploy` (o `--include=dev` é necessário: com `NODE_ENV=production`, o `npm ci` pula o `prisma`, que é devDependency)
+   - Start: `node src/server.js`
+   - Variáveis:
+     | Variável | Valor |
+     |---|---|
+     | `NODE_ENV` | `production` |
+     | `DATABASE_URL` | a string do passo 1 |
+     | `JWT_SECRET` | um segredo longo (`openssl rand -base64 48`) |
+     | `APP_BASE_URL` | o endereço do serviço, ex.: `https://mercadinho.onrender.com` |
+     | `CLIENT_ORIGIN` | o mesmo endereço |
+     | `TRUST_PROXY` | `1` |
+     | `SMTP_*` | como na seção de e-mail (opcional) |
+
+   Em produção o servidor **recusa iniciar** sem um `JWT_SECRET` forte ou sem `APP_BASE_URL` público. O cookie de sessão passa a ser `Secure` automaticamente.
+3. **Primeiro usuário:** no shell do serviço, rode uma vez
+   `ADMIN_NAME="Seu João" ADMIN_EMAIL=... ADMIN_PASSWORD=... npm run seed`.
+   Entre no sistema e troque a senha.
+4. **Conferência:** abra o endereço, faça uma venda de teste e cancele-a em *Vendas recentes*. O estoque volta.
 
 ## 📚 Documentação
 
