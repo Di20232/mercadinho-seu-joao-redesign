@@ -7,7 +7,7 @@
 - **Solução aplicada**:
   - `public/auto-login.html` passou a usar CSS e JS externos.
   - A lógica canônica ficou em `public/js/auto-login.js`.
-  - A página referencia `/css/auto-login.css` e `/js/auto-login.js`.
+  - Depois do redesign (26/10) a página usa `/css/style.css` e `/js/auto-login.js`. As cópias antigas `public/auto-login.js`, `public/auto-login.css` e `public/css/auto-login.css` foram removidas em 24/11/2026.
 
 ### 2. Auto-login inseguro - ✅ CORRIGIDO
 - **Problema**: o auto-login antigo materializava credenciais no frontend e podia conflitar com a matriz Admin/Caixa.
@@ -40,8 +40,6 @@
 | `src/routes/auth.js` | Endpoint `POST /api/auth/auto-login` | Sem credenciais no browser; somente Caixa |
 | `public/auto-login.html` | Remove CSS/JS inline e credenciais visíveis | CSP compliance e menos vazamento |
 | `public/js/auto-login.js` | Chama endpoint seguro de auto-login | Fluxo local/demo compatível com matriz de perfis |
-| `public/auto-login.js` | Shim de compatibilidade para URL antiga | Evita quebra de links antigos |
-| `public/css/auto-login.css` | CSS externo da tela | CSP compliance |
 | `public/css/style.css` | Classe `.error.notice` | Erro amigável sem inline style |
 | `public/js/app.js` | `try/catch` em `loadReports()` | Melhor diagnóstico na UI |
 | `src/routes/reports.js` | Ajuste do filtro `to` | Inclui vendas do dia inteiro |
@@ -58,7 +56,7 @@
 
 2. **Validar relatório de vendas manualmente**
    ```bash
-   TEST_ADMIN_EMAIL=admin@example.com TEST_ADMIN_PASSWORD="sua-senha" node test-relatorios.js
+   npm test   # o antigo test-relatorios.js foi removido; a suíte cobre o relatório
    ```
 
 3. **Validar auto-login local/demo**

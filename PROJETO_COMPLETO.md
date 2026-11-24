@@ -150,7 +150,7 @@ O auto-login é apenas para ambiente local/demo, fica desabilitado por padrão e
 
 ### Dados
 - `produtos-importacao.csv` — 26 produtos para importar
-- `simulate-data.js` — Script de simulação
+- `npm run simulate:sales` — Simulação de vendas (`prisma/simulateSales.js`)
 
 ### Relatórios
 - `REFACTORING_FINAL_REPORT.md` — Resumo completo

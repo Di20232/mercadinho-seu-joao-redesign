@@ -30,7 +30,7 @@
 
 #### Documentação & Scripts
 - ✅ `README.md` - Título e branding
-- ✅ `fluxos-completos.js` - Mensagem de header
+- ✅ `fluxos-completos.js` - Mensagem de header (script removido em 24/11/2026)
 - ✅ `REFACTORING_FINAL_REPORT.md` - Nome do projeto e JWT issuer/audience
 
 ---
