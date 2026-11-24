@@ -145,9 +145,14 @@ function areaChart(container, points, { formatValue = formatMoney, formatAxis = 
     }
 
     const every = Math.ceil(points.length / Math.max(2, Math.floor(innerW / 64)));
+    const last = points.length - 1;
     points.forEach((p, i) => {
-      if (i % every !== 0 && i !== points.length - 1) return;
-      const label = svgEl('text', { x: x(i), y: height - 8, 'text-anchor': 'middle', class: 'chart-axis-label' });
+      const isLast = i === last && last > 0;
+      // O último dia sempre aparece; um rótulo regular a menos de um passo
+      // dele ficaria encavalado ("23/1124/11"), então é pulado.
+      if (!isLast && (i % every !== 0 || (i !== 0 && last - i < every))) return;
+      const anchor = isLast ? 'end' : 'middle';
+      const label = svgEl('text', { x: x(i), y: height - 8, 'text-anchor': anchor, class: 'chart-axis-label' });
       label.textContent = p.label;
       svg.appendChild(label);
     });
