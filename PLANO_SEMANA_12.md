@@ -3,7 +3,7 @@
 Arquivo de acompanhamento, atualizado durante o trabalho. Fonte das tarefas: ClickUp,
 lista "Semana 12 · 09/11–13/11 · Interface e deploy".
 
-- **Branch:** `claude/pendencias-semana-12` (saiu de `claude/redesign-frontend`, `876523f`)
+- **Branch:** `claude/pendencias-semana-12` (rebaseada sobre `redesign/master`, `a82c5a1`)
 - **Banco de teste:** `mercadinho_joao_test` no container (porta 5433). O banco de desenvolvimento não é tocado por teste.
 - **Regra:** um commit por tarefa. Sem push e sem PR até o Diego pedir.
 
@@ -77,7 +77,8 @@ de cada recurso, e usá-lo nos 5 lugares sem mudar nenhuma mensagem que o usuár
 ## Registro
 
 **24/11/2026**
-- Linha de base: 44/44 (o ClickUp citava 47; a diferença era a suíte de segurança fora do `npm test`). Final: **48/48**.
+- Linha de base: 44/44. Final antes do rebase: **48/48**.
+- **Rebase:** o repositório `Di20232/mercadinho-seu-joao` não existe mais; o ativo é `Di20232/mercadinho-seu-joao-redesign`, cujo `master` tinha 5 commits a mais (permissões por pessoa, idempotência da venda, tutorial, planilhas de teste). A branch foi rebaseada sobre ele. Conflitos só na regra de "já cadastrado" (rotas com `requirePermission` e preço opcional via `decimalOrNull`, ambos mantidos) e nos testes (os dois lados ficaram). Os 47 testes do upstream eram a origem do "47" do ClickUp. Final: **54/54**.
 - `5c60563` `npm test` roda as duas suítes.
 - `76dc802` remove `src/mock-db.js`.
 - `1baead3` remove 7 scripts soltos da raiz e as 3 cópias antigas do auto-login; ajusta citações nos `.md`.
