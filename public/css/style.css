@@ -1313,7 +1313,10 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
 @media (max-width: 1180px) {
   .dash-grid.three { grid-template-columns: 1fr 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pos-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+  /* Com a barra lateral aberta, o carrinho ficava com ~330px em 1024px e
+     escondia subtotal e "remover". Empilha carrinho e resumo. */
+  .pos-grid { grid-template-columns: 1fr; }
+  .pos-summary { position: static; }
 }
 
 @media (max-width: 960px) {
@@ -1348,6 +1351,38 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   .user-chip { padding: 4px; }
   .toast-stack { left: 16px; right: 16px; bottom: 16px; align-items: stretch; }
   .toast { min-width: 0; max-width: none; }
+}
+
+/* Celular: nada passa da largura da tela e todo alvo de toque tem ao menos
+   40px de altura (os filtros e botões pequenos tinham 29px). */
+@media (max-width: 600px) {
+  .filter-bar > div { width: 100%; }
+  .filter-bar .date-range { flex-wrap: wrap; }
+  .filter-bar .date-range > div { flex: 1 1 130px; min-width: 0; }
+  .filter-bar .date-range input { width: 100%; }
+  .filter-bar .date-range button { flex: 1 1 100%; }
+
+  .segmented button,
+  button.small,
+  a.btn,
+  .pager button { min-height: 40px; }
+  .segmented button { padding-left: 14px; padding-right: 14px; }
+
+  /* Coluna de ações (editar, cancelar, remover) fica presa à direita, para
+     não depender de rolar a tabela até o fim. */
+  .table td.td-actions,
+  .table:has(td.td-actions) th:last-child {
+    position: sticky; right: 0;
+    box-shadow: -8px 0 8px -8px rgba(0, 0, 0, 0.35);
+  }
+  .table td.td-actions { background: var(--surface); }
+
+  /* Em duas colunas os valores ("R$ 1.484,81") eram cortados. */
+  .kpi-grid, .stat-cards { grid-template-columns: 1fr; }
+
+  /* Telas de conta: links de texto e o olho da senha ficavam com 17–28px. */
+  .link-action { display: inline-flex; align-items: center; min-height: 40px; }
+  .field-action { min-width: 36px; min-height: 36px; justify-content: center; align-items: center; }
 }
 
 /* ---------- Impressão do comprovante ---------- */
