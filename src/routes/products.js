@@ -6,6 +6,7 @@ const httpError = require('../httpError');
 const { DUPLICATE, ensureAvailable, guardUnique } = require('../uniqueError');
 const { authenticate } = require('../auth');
 const { clampIntParam } = require('../queryHelpers');
+const { findProductIdsByName } = require('../productSearch');
 const { can, requirePermission } = require('../permissions');
 
 const router = express.Router();
@@ -84,7 +85,8 @@ router.get('/', async (req, res) => {
   const { query, category, lowStock, includeInactive, pricePending } = req.query;
   const where = {};
   if (!(includeInactive === 'true' && canEditCatalog(req.user))) where.active = true;
-  if (query) where.name = { contains: String(query), mode: 'insensitive' };
+  // Busca sem acento: "cafe" acha "Café" (ver src/productSearch.js).
+  if (query) where.id = { in: await findProductIdsByName(query) };
   if (category) where.category = String(category);
   if (pricePending === 'true') Object.assign(where, PRICE_PENDING_WHERE);
 

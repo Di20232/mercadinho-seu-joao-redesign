@@ -1117,3 +1117,37 @@ test('já cadastrado: corrida entre duas gravações (P2002) vira 409 e outros e
   assert.equal(isUniqueViolation(race), true);
   assert.equal(isUniqueViolation(null), false);
 });
+
+// Busca de produto ignora acentos e maiúsculas (src/productSearch.js). É a
+// mesma rota que o caixa usa ao digitar e a tela de Produtos usa paginada.
+test('busca: "cafe", "CAFE" e "café" acham "Café"; % e _ digitados são literais', async () => {
+  const names = ['Café Zbusca Torrado', 'AÇÚCAR Zbusca Cristal', 'Pão Zbusca 100% Integral', 'Feijão Zbusca_Preto'];
+  for (const name of names) {
+    const res = await request(baseUrl, adminJar, '/api/products', {
+      method: 'POST',
+      body: { name, unit: 'UN', costPrice: 1, salePrice: 2 },
+    });
+    assert.equal(res.status, 201);
+  }
+  const search = async (term) => {
+    const res = await request(baseUrl, adminJar, `/api/products?query=${encodeURIComponent(term)}`);
+    assert.equal(res.status, 200);
+    return res.body.map((p) => p.name).sort();
+  };
+
+  for (const term of ['cafe zbusca', 'CAFE ZBUSCA', 'café zbusca', 'CAFÉ ZBUSCA']) {
+    assert.deepEqual(await search(term), ['Café Zbusca Torrado'], `"${term}" deveria achar o café`);
+  }
+  assert.deepEqual(await search('acucar zbusca'), ['AÇÚCAR Zbusca Cristal']);
+  assert.deepEqual(await search('zbusca integral'), [], 'termo fora de ordem não é "contém"');
+  assert.deepEqual(await search('pao zbusca'), ['Pão Zbusca 100% Integral']);
+  assert.equal((await search('zbusca')).length, 4);
+
+  // Sem escapar, "%" e "_" virariam curingas e achariam tudo.
+  assert.deepEqual(await search('100%'), ['Pão Zbusca 100% Integral']);
+  assert.deepEqual(await search('zbusca_'), ['Feijão Zbusca_Preto']);
+
+  const paged = await request(baseUrl, adminJar, `/api/products?query=${encodeURIComponent('FEIJAO ZBUSCA')}&page=1&pageSize=20`);
+  assert.equal(paged.body.totalCount, 1);
+  assert.equal(paged.body.products[0].name, 'Feijão Zbusca_Preto');
+});
