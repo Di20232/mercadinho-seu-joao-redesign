@@ -1117,3 +1117,111 @@ test('já cadastrado: corrida entre duas gravações (P2002) vira 409 e outros e
   assert.equal(isUniqueViolation(race), true);
   assert.equal(isUniqueViolation(null), false);
 });
+
+// Busca de produto ignora acentos e maiúsculas (src/productSearch.js). É a
+// mesma rota que o caixa usa ao digitar e a tela de Produtos usa paginada.
+test('busca: "cafe", "CAFE" e "café" acham "Café"; % e _ digitados são literais', async () => {
+  const names = ['Café Zbusca Torrado', 'AÇÚCAR Zbusca Cristal', 'Pão Zbusca 100% Integral', 'Feijão Zbusca_Preto'];
+  for (const name of names) {
+    const res = await request(baseUrl, adminJar, '/api/products', {
+      method: 'POST',
+      body: { name, unit: 'UN', costPrice: 1, salePrice: 2 },
+    });
+    assert.equal(res.status, 201);
+  }
+  const search = async (term) => {
+    const res = await request(baseUrl, adminJar, `/api/products?query=${encodeURIComponent(term)}`);
+    assert.equal(res.status, 200);
+    return res.body.map((p) => p.name).sort();
+  };
+
+  for (const term of ['cafe zbusca', 'CAFE ZBUSCA', 'café zbusca', 'CAFÉ ZBUSCA']) {
+    assert.deepEqual(await search(term), ['Café Zbusca Torrado'], `"${term}" deveria achar o café`);
+  }
+  assert.deepEqual(await search('acucar zbusca'), ['AÇÚCAR Zbusca Cristal']);
+  assert.deepEqual(await search('zbusca integral'), [], 'termo fora de ordem não é "contém"');
+  assert.deepEqual(await search('pao zbusca'), ['Pão Zbusca 100% Integral']);
+  assert.equal((await search('zbusca')).length, 4);
+
+  // Sem escapar, "%" e "_" virariam curingas e achariam tudo.
+  assert.deepEqual(await search('100%'), ['Pão Zbusca 100% Integral']);
+  assert.deepEqual(await search('zbusca_'), ['Feijão Zbusca_Preto']);
+
+  const paged = await request(baseUrl, adminJar, `/api/products?query=${encodeURIComponent('FEIJAO ZBUSCA')}&page=1&pageSize=20`);
+  assert.equal(paged.body.totalCount, 1);
+  assert.equal(paged.body.products[0].name, 'Feijão Zbusca_Preto');
+});
+
+// ---------- Correções do teste de inconsistências e de carga (24/11/2026) ----------
+
+const criarProduto = async (body) => {
+  const res = await request(baseUrl, adminJar, '/api/products', { method: 'POST', body: { costPrice: 1, ...body } });
+  assert.equal(res.status, 201, `criar produto "${body.name}"`);
+  return res.body;
+};
+const vender = (items, jar = adminJar) => request(baseUrl, jar, '/api/sales', { method: 'POST', body: { items } });
+
+test('vendas simultâneas: o histórico grava os saldos em sequência (5→4, 4→3, 3→2, 2→1, 1→0)', async () => {
+  const product = await criarProduto({ name: 'Produto Saldo Encadeado', unit: 'UN', salePrice: 2, initialStock: 5 });
+
+  const results = await Promise.all(Array.from({ length: 5 }, () => vender([{ productId: product.id, quantity: 1 }])));
+  assert.deepEqual(results.map((r) => r.status), [201, 201, 201, 201, 201]);
+
+  // Antes, o saldo "anterior" vinha de uma leitura feita antes da trava:
+  // vendas concorrentes gravavam todas "5→4" e o histórico mentia.
+  const movements = await prisma.stockMovement.findMany({ where: { productId: product.id, type: 'SALE' } });
+  const anteriores = movements.map((m) => Number(m.previousStock)).sort((a, b) => a - b);
+  assert.deepEqual(anteriores, [1, 2, 3, 4, 5], 'cada venda tem de partir do saldo deixado pela anterior');
+  for (const m of movements) assert.equal(Number(m.newStock), Number(m.previousStock) - 1);
+});
+
+test('impasse: vendas simultâneas com os mesmos produtos em ordem inversa nunca falham', async () => {
+  const [a, b, c] = await Promise.all(['Impasse A', 'Impasse B', 'Impasse C'].map((name) =>
+    criarProduto({ name, unit: 'UN', salePrice: 2, initialStock: 1000 })));
+  const ids = [a.id, b.id, c.id];
+
+  // Metade dos carrinhos em uma ordem, metade na ordem inversa: antes, uma
+  // venda travava o produto A e esperava o C enquanto outra fazia o
+  // contrário, o PostgreSQL acusava deadlock e o caixa recebia erro 500.
+  const carrinhos = Array.from({ length: 30 }, (_, i) =>
+    (i % 2 ? [...ids] : [...ids].reverse()).map((productId) => ({ productId, quantity: 1 })));
+  const results = await Promise.all(carrinhos.map((items) => vender(items)));
+  assert.deepEqual([...new Set(results.map((r) => r.status))], [201], 'nenhuma venda pode falhar por impasse');
+
+  for (const id of ids) {
+    const p = await request(baseUrl, adminJar, `/api/products/${id}`);
+    assert.equal(p.body.currentStock, 970);
+  }
+});
+
+test('venda: quantidade com mais de 3 casas decimais é recusada (não vira venda de R$ 0,00)', async () => {
+  const product = await criarProduto({ name: 'Produto Granel Decimais', unit: 'KG', salePrice: 10, initialStock: 10 });
+  const vendasAntes = await prisma.sale.count();
+
+  // 0,0004 passava no "positive()", mas a coluna guarda 3 casas: gravava uma
+  // venda de quantidade 0 e R$ 0,00 que contava nos relatórios.
+  const res = await vender([{ productId: product.id, quantity: 0.0004 }]);
+  assert.equal(res.status, 400);
+  assert.equal(await prisma.sale.count(), vendasAntes, 'nenhuma venda pode ser gravada');
+});
+
+test('venda: produto vendido por unidade não aceita fração; por quilo aceita', async () => {
+  const un = await criarProduto({ name: 'Produto Por Unidade', unit: 'UN', salePrice: 2, initialStock: 10 });
+  const kg = await criarProduto({ name: 'Produto Por Quilo', unit: 'kg', salePrice: 10, initialStock: 10 });
+
+  const meia = await vender([{ productId: un.id, quantity: 0.5 }]);
+  assert.equal(meia.status, 400, 'meia unidade não existe');
+
+  const granel = await vender([{ productId: kg.id, quantity: 0.5 }]);
+  assert.equal(granel.status, 201);
+  assert.equal(granel.body.totalAmount, 5);
+
+  assert.equal((await request(baseUrl, adminJar, `/api/products/${un.id}`)).body.currentStock, 10);
+  assert.equal((await request(baseUrl, adminJar, `/api/products/${kg.id}`)).body.currentStock, 9.5);
+});
+
+test('venda: item que sairia por R$ 0,00 é recusado', async () => {
+  const product = await criarProduto({ name: 'Produto Centavo', unit: 'KG', salePrice: 0.01, initialStock: 10 });
+  const res = await vender([{ productId: product.id, quantity: 0.001 }]);
+  assert.equal(res.status, 400);
+});

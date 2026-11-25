@@ -175,7 +175,7 @@ docker-compose.yml      # Composição de containers
 npm test
 ```
 
-Roda as duas suítes (`test/integration.test.js` e `test/security.test.js`), com 54 testes. A suíte de integração **apaga todas as tabelas** antes de rodar e se recusa a rodar se o nome do banco em `DATABASE_URL` não contiver `test`. Aponte para um banco só de testes, por exemplo `.../mercadinho_joao_test`.
+Roda as duas suítes (`test/integration.test.js` e `test/security.test.js`). A suíte de integração **apaga todas as tabelas** antes de rodar e se recusa a rodar se o nome do banco em `DATABASE_URL` não contiver `test`. Aponte para um banco só de testes, por exemplo `.../mercadinho_joao_test`.
 
 O que é coberto: login e sessão, CSRF e CORS, vendas e estoque (inclusive vendas simultâneas), cancelamento, permissões de dono e caixa, recuperação de senha, importação e exportação de planilhas, relatórios, "já cadastrado" (e-mail e código de barras), JWT e a configuração exigida em produção.
 
