@@ -762,50 +762,6 @@ paths:
         '200': { $ref: '#/components/responses/FileExport' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
-  /reports/email:
-    post:
-      tags: [reports]
-      summary: Enviar o relatório do período por e-mail (reports.view)
-      description: |
-        Resumo no corpo e um XLSX com as abas Resumo, Vendas por dia, Mais vendidos (50), Produtos parados (60 dias)
-        e Previsão de estoque. Usa o SMTP do .env. Limite de 10 envios a cada 15 minutos por IP.
-      parameters:
-        - $ref: '#/components/parameters/XRequestedWith'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email: { type: string, format: email, maxLength: 255 }
-                from: { type: string, format: date, description: AAAA-MM-DD }
-                to: { type: string, format: date, description: AAAA-MM-DD; inclui o dia inteiro. }
-      responses:
-        '200':
-          description: Enviado.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok: { type: boolean, example: true }
-                  sentTo: { type: string, format: email }
-        '400': { $ref: '#/components/responses/Validation' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/TooMany' }
-        '502':
-          description: O servidor SMTP recusou ou não respondeu.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '503':
-          description: SMTP não configurado.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-
   /users/permissions:
     get:
       tags: [users]

@@ -28,7 +28,6 @@ Quando alguém da equipe técnica sai: remova os acessos acima, troque a senha d
 | Pessoa da equipe fazendo o que não deve | Permissões checadas no servidor em cada rota e lidas do banco a cada requisição; lista fechada de permissões | `src/permissions.js`, `src/routes/*.js` |
 | Estoque mexendo em preço ou vendo custo | Preço só com `prices.manage`; custo e margem filtrados na API | `src/routes/products.js` |
 | Venda duplicada por rede instável | Confirmação idempotente | `src/routes/sales.js` |
-| Sistema usado para disparar e-mails em massa | Relatório por e-mail limitado a 10 envios por 15 min por IP, só com `reports.view` | `src/routes/reports.js` |
 | Busca com SQL cru | `$queryRaw` parametrizado e `LIKE` com escape | `src/productSearch.js` |
 | Cookie roubado antes de trocar a senha | `sessionVersion` invalida tokens antigos | `src/auth.js` |
 | CSRF | Cabeçalho `X-Requested-With` obrigatório nas escritas + CORS restrito | `src/auth.js`, `src/app.js` |
@@ -49,7 +48,6 @@ Quando alguém da equipe técnica sai: remova os acessos acima, troque a senha d
 
 - **Logs fora de produção contêm links válidos de nova senha** (`[forgot-password] link de reset para ...`). Não compartilhe esses logs.
 - **`npm run simulate:sales` cria um caixa com senha que está no código**, se não houver caixa ativo. **`npm run seed:perfis` cria três contas (financeiro, estoque, caixa) com senha que está no código**; ele recusa produção, o simulador não. Os dois só em ambiente local.
-- **O relatório por e-mail vai para qualquer endereço** digitado: quem tem "Ver faturamento e relatórios" pode mandar os números da loja para fora. É confiança dada junto com a permissão; não há lista de destinatários permitidos (dívida DT-26).
 - **Permissões são poder real**: "Definir preços" importa planilha e reescreve preços e saldos em massa; "Cancelar qualquer venda" mexe no estoque. Revise de tempos em tempos quem tem o quê em Usuários.
 - **Senha do banco local padrão** (`changeme_local_only`) está no `docker-compose.yml`. A porta 5433 fica aberta no computador: em rede da loja, quem alcança o computador alcança o banco. Troque `POSTGRES_PASSWORD` no `.env` se o computador ficar na rede da loja.
 - **Rate limit em memória**: reiniciar zera; mais de uma instância conta separado.

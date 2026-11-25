@@ -4,6 +4,7 @@ O que mudou para quem usa, em linguagem do dia a dia. A lista técnica completa 
 
 ## 25/11/2026
 
+- **Saiu o "Enviar por e-mail" dos Relatórios.** Para mandar os números a alguém, baixe a planilha e anexe no seu e-mail.
 - **Cadastro com liberação do dono.** Quem cria conta pela tela "Criar conta" fica esperando: o dono libera em Usuários. Antes, a pessoa já entrava vendendo.
 - **Validade com a data certa.** A validade aparecia um dia antes (26/11 virava 25/11), e o produto que vence hoje ficava fora do e-mail diário.
 - **Importação avisa o que muda.** Na conferência, a linha que troca nome, categoria, unidade, mínimo ou validade de um produto que já existe aparece com aviso, assim como validade vencida.

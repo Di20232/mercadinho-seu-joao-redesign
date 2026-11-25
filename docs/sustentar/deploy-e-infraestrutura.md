@@ -110,7 +110,7 @@ Lidas em `src/config.js` (e nos scripts de `prisma/`). "Obrigatória em produç�
 | `FORECAST_WINDOW_DAYS` | `30` | `30` | Janela da previsão |
 | `EXPIRY_ALERT_DAYS` | `7` | `7` | Dias para "vencendo em breve" |
 | `LOW_STOCK_ALERT_HOUR` | `8` | ajuste ao fuso (ver abaixo) | Hora do e-mail diário (0 a 23, relógio do servidor) |
-| `SMTP_HOST` | vazio (e-mail desligado) | `smtp.gmail.com` ou outro | Servidor de e-mail (nova senha, alerta diário, relatório por e-mail) |
+| `SMTP_HOST` | vazio (e-mail desligado) | `smtp.gmail.com` ou outro | Servidor de e-mail (nova senha, alerta diário) |
 | `SMTP_PORT` | `587` | `587` (STARTTLS) ou `465` (TLS) | |
 | `SMTP_USER`, `SMTP_PASS` | vazios | conta e senha de app | Autenticação SMTP |
 | `SMTP_FROM` | `Mercadinho do João <no-reply@mercadinhodojoao.local>` | remetente real | |

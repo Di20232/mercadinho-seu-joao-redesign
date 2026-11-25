@@ -236,8 +236,6 @@ Para quem vê faturamento (dono e financeiro). Escolha o período: **Hoje**, **7
 
 Os botões de planilha baixam o resumo por dia e os mais vendidos em Excel. Vendas canceladas não entram em nenhum relatório.
 
-**Enviar por e-mail:** manda o relatório do período escolhido para um endereço (vem preenchido com o seu e-mail). Vai um resumo no corpo (total, vendas, ticket médio, 5 mais vendidos, produtos parados) e um Excel com uma aba por relatório: resumo, vendas por dia, mais vendidos (50), produtos parados e previsão de estoque. Só funciona com o envio de e-mail configurado no servidor; são até 10 envios a cada 15 minutos.
-
 ## Instalar no celular
 
 O sistema pode virar um app no celular, com ícone próprio e tela cheia. Quando ele é aberto no celular pelo navegador, aparece o aviso **Instale o Mercadinho no celular**:
