@@ -19,6 +19,7 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 `master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação, o PR #11 (correções do teste do sistema inteiro) e o PR #12 (Vendas no celular).
 
 ### Adicionado
+- `render.yaml` (Blueprint do Render): serviço web Node 22, `TZ=America/Sao_Paulo`, `JWT_SECRET` gerado e o dono criado no build, sem shell. Sem `APP_BASE_URL`, o sistema usa o `RENDER_EXTERNAL_URL`.
 - Documentação completa em `docs/`, organizada em usar, manter, sustentar e evoluir, com OpenAPI, ADRs e SBOM.
 - Relatório por e-mail: `POST /api/reports/email`, resumo no corpo e Excel com cinco abas (`5090d02`, PR #3).
 - App instalável no celular (PWA): manifest, service worker sem cache de dados, página offline, ícones e aviso "Instalar app" ([ADR-0018](../manter/adr/0018-app-instalavel-sem-cache-de-dados.md); `a60716d`, `b7cd290`, PRs #7 e #9).

@@ -144,6 +144,7 @@ test('produção: config recusa APP_BASE_URL ausente ou localhost e aceita ender
   const run = (appBaseUrl) => {
     const env = { ...process.env, NODE_ENV: 'production', JWT_SECRET: 'segredo-de-teste-forte-0123456789abcdef' };
     delete env.APP_BASE_URL;
+    delete env.RENDER_EXTERNAL_URL;
     if (appBaseUrl !== undefined) env.APP_BASE_URL = appBaseUrl;
     return spawnSync(process.execPath, ['-e', `require(${JSON.stringify(configPath)})`], { env, encoding: 'utf8' });
   };
@@ -157,4 +158,12 @@ test('produção: config recusa APP_BASE_URL ausente ou localhost e aceita ender
 
   const ok = run('https://mercadinho.exemplo.com.br');
   assert.strictEqual(ok.status, 0, ok.stderr);
+
+  // No Render, sem APP_BASE_URL, vale o endereço que o Render cria.
+  const render = spawnSync(process.execPath, ['-e', `process.stdout.write(require(${JSON.stringify(configPath)}).appBaseUrl)`], {
+    env: { ...process.env, NODE_ENV: 'production', JWT_SECRET: 'segredo-de-teste-forte-0123456789abcdef', APP_BASE_URL: '', RENDER_EXTERNAL_URL: 'https://mercadinho-do-joao.onrender.com' },
+    encoding: 'utf8',
+  });
+  assert.strictEqual(render.status, 0, render.stderr);
+  assert.strictEqual(render.stdout, 'https://mercadinho-do-joao.onrender.com');
 });

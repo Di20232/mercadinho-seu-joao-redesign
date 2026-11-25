@@ -16,6 +16,8 @@ Publicar como serviço web Node:
 - Banco: PostgreSQL gerenciado, string de conexão **direta** (sem pooler), com `sslmode=require`.
 - Variáveis obrigatórias em produção: `NODE_ENV=production`, `DATABASE_URL`, `JWT_SECRET` forte, `APP_BASE_URL` e `CLIENT_ORIGIN` com o endereço público, `TRUST_PROXY=1`.
 
+Complemento (25/11/2026): o caminho preparado é o Blueprint `render.yaml` do Render. O build também roda o seed do dono quando `ADMIN_EMAIL` está definido (idempotente: não cria um segundo dono), o que dispensa o shell. Sem `APP_BASE_URL`, vale o `RENDER_EXTERNAL_URL`, e `TZ=America/Sao_Paulo` vem no arquivo.
+
 ## Consequências
 
 - Ganha: nada de registry de imagem; o provedor builda a partir do repositório.

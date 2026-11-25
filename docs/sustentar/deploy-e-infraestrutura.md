@@ -37,20 +37,22 @@ O `Dockerfile` serve **só** para o compose: na nuvem não existe host `db` ([AD
 
 ## Publicar na nuvem (primeira vez)
 
-1. **Banco (Neon ou Supabase).** Crie um projeto PostgreSQL 16 e copie a string de conexão **direta** (sem pooler). Acrescente `?sslmode=require` no fim, se o provedor não colocar.
-2. **Serviço web (Render ou Railway)** a partir do repositório `Di20232/mercadinho-seu-joao-redesign`, branch `master`:
-   - Build: `npm ci --include=dev && npx prisma migrate deploy`
-   - Start: `node src/server.js`
-   - Versão do Node: fixe a 22 no provedor (o `engines` do `package.json` diz só `>=18`).
-   - Variáveis: a tabela "Produção" abaixo.
-3. **Primeiro acesso.** No shell do serviço, uma vez:
-   ```bash
-   ADMIN_NAME="Seu João" ADMIN_EMAIL=dono@exemplo.com ADMIN_PASSWORD='senha-forte' npm run seed
-   ```
-   Entre no sistema e troque a senha em Usuários.
-4. **Conferência.** Abra o endereço público, faça uma venda de teste e cancele em Vendas recentes. Confira o estoque de volta no histórico. Peça "Esqueci minha senha" e confira o e-mail.
-5. **App no celular.** Com HTTPS do provedor, abra o endereço no Chrome do Android e confira o aviso "Instalar app" ([ADR-0018](../manter/adr/0018-app-instalavel-sem-cache-de-dados.md)). Em HTTP pelo IP da rede local a instalação não aparece.
-6. **Monitoramento mínimo** e **backup**: [monitoramento](monitoramento.md) e [backup](backup-e-continuidade.md).
+O caminho preparado é o **Render** com o arquivo `render.yaml` da raiz (Blueprint) e o banco no **Neon**. Não precisa de shell, o que o plano gratuito do Render não tem.
+
+1. **Banco (Neon).** Crie um projeto PostgreSQL na região **AWS us-east-1** (a mesma do Render em Virginia). Copie a string de conexão **direta** (desligue "Connection pooling") e confira o `?sslmode=require` no fim.
+2. **Serviço (Render).** New → **Blueprint** → repositório `Di20232/mercadinho-seu-joao-redesign`. O Render lê o `render.yaml` e pede, no próprio painel:
+   - `DATABASE_URL`: a string do Neon;
+   - `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`: o dono do mercadinho (senha forte, mínimo de 8 caracteres).
+   O resto já vem do arquivo: `NODE_ENV=production`, Node 22, `TZ=America/Sao_Paulo`, `TRUST_PROXY=1` e `JWT_SECRET` gerado pelo Render.
+3. **Primeiro deploy.** O build roda `npm ci --include=dev`, as migrations e o seed do dono. O seed só cria o dono se ainda não houver nenhum: nos deploys seguintes não faz nada. Depois do primeiro deploy, **apague `ADMIN_PASSWORD`** do painel e troque a senha em Usuários.
+4. **Endereço.** Sem `APP_BASE_URL`, o sistema usa o endereço que o Render cria (`RENDER_EXTERNAL_URL`, ex.: `https://mercadinho-do-joao.onrender.com`). Defina `APP_BASE_URL` só ao trocar para domínio próprio.
+5. **Conferência.** Abra o endereço público, faça uma venda de teste e cancele em Vendas recentes. Confira o estoque de volta no histórico. Peça "Esqueci minha senha" e confira o e-mail (só com SMTP configurado).
+6. **App no celular.** Abra o endereço no Chrome do Android e use o aviso "Instalar app" ([ADR-0018](../manter/adr/0018-app-instalavel-sem-cache-de-dados.md)). Com o endereço fixo, o app instalado não quebra mais.
+7. **Monitoramento mínimo** e **backup**: [monitoramento](monitoramento.md) e [backup](backup-e-continuidade.md).
+
+**Plano gratuito do Render:** o serviço dorme depois de ~15 minutos sem acesso, e o primeiro acesso seguinte leva de 30 s a 1 min. Para uso diário na loja, o plano `starter` não dorme (troque `plan` no `render.yaml` ou no painel).
+
+Sem o Blueprint (outro provedor, ou o Render configurado à mão): build `npm ci --include=dev && npx prisma migrate deploy`, start `node src/server.js`, Node 22, as variáveis da tabela "Produção" abaixo, e o dono criado uma vez com `ADMIN_NAME=... ADMIN_EMAIL=... ADMIN_PASSWORD='...' npm run seed`.
 
 Nunca rode `seed:products`, `simulate:sales`, `simulate:history` nem `seed:perfis` em produção (o `simulate:history` também se recusa): os dois últimos criam contas com senha que está no código (o `seed:perfis` se recusa com `NODE_ENV=production`; o `simulate:sales`, não).
 
@@ -99,7 +101,7 @@ Lidas em `src/config.js` (e nos scripts de `prisma/`). "Obrigatória em produç�
 | `DATABASE_URL` | nenhum | **obrigatória** (o Prisma falha sem ela) | Conexão com o PostgreSQL |
 | `JWT_SECRET` | segredo de desenvolvimento | **obrigatória**, forte (`openssl rand -base64 48`) | Assina a sessão |
 | `JWT_EXPIRES_IN` | `8h` | `8h` | Validade do token (o cookie dura 8 h fixas) |
-| `APP_BASE_URL` | `http://localhost:<PORT>` | **obrigatória**, endereço público, não localhost | Monta o link do e-mail de nova senha |
+| `APP_BASE_URL` | `http://localhost:<PORT>` | **obrigatória**, endereço público, não localhost (no Render, se faltar, vale `RENDER_EXTERNAL_URL`) | Monta o link do e-mail de nova senha |
 | `CLIENT_ORIGIN` | `http://localhost:<PORT>` | o endereço público | Origens extras aceitas pelo CORS, separadas por vírgula |
 | `COOKIE_SECURE` | `false` | ignorado: sempre `true` | Cookie só em HTTPS |
 | `TRUST_PROXY` | `0` | `1` no Render/Railway | Quantos proxies confiáveis na frente (IP real para o rate limit) |
