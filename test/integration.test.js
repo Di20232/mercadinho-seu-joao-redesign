@@ -1,4 +1,8 @@
 process.env.NODE_ENV = 'test';
+// O limite geral (300 requisições/min por IP) protege a loja, mas a suíte
+// inteira roda do mesmo IP em segundos: passados ~300 pedidos, os testes do
+// fim começavam a levar 429. Vale só aqui; produção segue com o padrão.
+process.env.API_RATE_LIMIT_MAX = process.env.API_RATE_LIMIT_MAX_TEST || '100000';
 // Testes de integração de regressão: rodam contra um PostgreSQL real (não
 // mocks) e sobem a aplicação de verdade na memória, exatamente como ela
 // roda em produção. Protegem especificamente contra os bugs mais graves
