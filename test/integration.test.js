@@ -1298,3 +1298,35 @@ test('validade: alerta diário inclui o produto que vence hoje, com a data certa
   assert.ok(text, 'deveria haver alerta');
   assert.match(text, new RegExp(`- Iogurte Zvalidade Hoje: vence em ${todayBr.replace(/\//g, '\/')}`));
 });
+
+// A conferência mostra preço e estoque em colunas; o resto que a planilha muda
+// num produto existente precisa aparecer nas observações. Sem isso, uma linha
+// com o mesmo código de barras e outro nome renomeava o produto em silêncio.
+test('importação: conferência avisa troca de nome, mínimo, categoria e validade vencida', async () => {
+  const created = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Arroz Zconferencia 5kg', barcode: '7890000000777', category: 'Mercearia', unit: 'PCT', costPrice: 18, salePrice: 24, minStock: 10 },
+  });
+  assert.equal(created.status, 201);
+
+  const rows = [
+    ['Arroz Zconferencia 5kg (repetido)', '7890000000777', 'Grãos', 'PCT', '18,00', '24,00', '', '5', ''],
+    ['Iogurte Zconferencia', '7890000000778', 'Laticínios', 'UN', '1,00', '2,00', '3', '1', '01/01/2020'],
+    ['Arroz Zconferencia Igual', '7890000000779', 'Mercearia', 'UN', '1,00', '2,00', '', '0', ''],
+  ];
+  const preview = await request(baseUrl, adminJar, '/api/imports/products/preview', { method: 'POST', body: importBody(rows) });
+  assert.equal(preview.status, 200);
+  const [rename, expired, fresh] = preview.body.items;
+
+  assert.equal(rename.action, 'update');
+  assert.ok(rename.warnings.includes('Nome muda de "Arroz Zconferencia 5kg" para "Arroz Zconferencia 5kg (repetido)".'), JSON.stringify(rename.warnings));
+  assert.ok(rename.warnings.includes('Estoque mínimo: 10 → 5.'));
+  assert.ok(rename.warnings.includes('Categoria: Mercearia → Grãos.'));
+  assert.ok(!rename.warnings.some((w) => w.startsWith('Unidade')), 'unidade igual não vira aviso');
+
+  assert.equal(expired.action, 'create');
+  assert.ok(expired.warnings.includes('Validade 01/01/2020 já passou.'));
+
+  assert.equal(fresh.action, 'create');
+  assert.deepEqual(fresh.warnings, [], 'produto novo sem nada de estranho não ganha aviso');
+});

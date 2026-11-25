@@ -228,7 +228,14 @@ function normalizeRow(cells, mapping, options) {
   if (rawExpiry !== undefined && cellText(rawExpiry) !== '') {
     const parsed = parseDate(rawExpiry);
     if (!parsed) errors.push(`Validade: "${cellText(rawExpiry)}" não é uma data válida (use 31/12/2026).`);
-    else values.expiryDate = parsed;
+    else {
+      values.expiryDate = parsed;
+      // Aviso, não erro: a planilha pode estar registrando um lote que já
+      // venceu e precisa sair da prateleira.
+      const now = new Date();
+      const today = toIsoDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      if (parsed < today) warnings.push(`Validade ${parsed.split('-').reverse().join('/')} já passou.`);
+    }
   }
 
   if (values.costPrice !== undefined && values.salePrice !== undefined && values.costPrice > values.salePrice) {
