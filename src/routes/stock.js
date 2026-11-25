@@ -80,6 +80,14 @@ const TYPE_LABELS = { ENTRY: 'Entrada', SALE: 'Venda', ADJUSTMENT: 'Ajuste', LOS
 // 20 mil levam ~3 s. Acima disso a planilha avisa que está cortada.
 const EXPORT_LIMIT = 20_000;
 
+// Planilha de movimentações: data com hora no horário da loja. Formatar no
+// fuso do servidor (UTC numa hospedagem) jogava uma venda das 22h para o dia
+// seguinte, e o CSV mostrava só a data.
+const EXPORT_DATE_TIME = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+});
+
 async function sendExport(res, format, filenamePrefix, sheetName, headers, rows) {
   const fmt = (format || 'csv').toLowerCase();
   if (fmt === 'xlsx') {
@@ -169,7 +177,7 @@ router.get('/movements/export', async (req, res) => {
 
   const headers = ['Data/Hora', 'Produto', 'Tipo', 'Quantidade', 'Estoque Anterior', 'Novo Estoque', 'Motivo', 'Usuário'];
   const rows = movements.map((m) => [
-    m.createdAt,
+    EXPORT_DATE_TIME.format(m.createdAt).replace(',', ''),
     m.product.name,
     TYPE_LABELS[m.type] || m.type,
     Number(m.quantity),

@@ -1330,3 +1330,19 @@ test('importação: conferência avisa troca de nome, mínimo, categoria e valid
   assert.equal(fresh.action, 'create');
   assert.deepEqual(fresh.warnings, [], 'produto novo sem nada de estranho não ganha aviso');
 });
+
+test('exportação: movimentações saem com data e hora de Brasília e o tipo em português', async () => {
+  const product = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Zexport Mov', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 4 },
+  });
+  const res = await fetch(`${baseUrl}/api/stock/movements/export?format=csv&productId=${product.body.id}`, {
+    headers: { Cookie: adminJar.header(), 'X-Requested-With': 'fetch' },
+  });
+  assert.equal(res.status, 200);
+  const line = (await res.text()).split('\r\n')[1];
+  assert.match(line, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2};Produto Zexport Mov;Entrada;4;0;4;/);
+
+  const expected = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
+  assert.ok(line.startsWith(expected), `data esperada em Brasília: ${expected}, veio: ${line.slice(0, 16)}`);
+});
