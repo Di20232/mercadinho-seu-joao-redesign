@@ -1276,3 +1276,25 @@ test('exportação: histórico do estoque sai com o tipo em português', async (
   assert.match(csv, /Produto Exporta Tipo;Entrada;/);
   assert.doesNotMatch(csv, /;ENTRY;/);
 });
+
+// Validade é data sem hora, gravada como meia-noite UTC. Lida no fuso local
+// ela aparecia um dia antes, e o alerta diário (que comparava com "agora")
+// pulava justamente o produto que vence hoje.
+test('validade: alerta diário inclui o produto que vence hoje, com a data certa', async () => {
+  const { buildAlertText } = require('../src/jobs/dailyAlerts');
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const todayBr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+
+  const created = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Iogurte Zvalidade Hoje', unit: 'UN', costPrice: 1, salePrice: 2, expiryDate: todayKey },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.expiryDate.slice(0, 10), todayKey, 'a API devolve o dia gravado');
+
+  const text = await buildAlertText();
+  assert.ok(text, 'deveria haver alerta');
+  assert.match(text, new RegExp(`- Iogurte Zvalidade Hoje: vence em ${todayBr.replace(/\//g, '\/')}`));
+});

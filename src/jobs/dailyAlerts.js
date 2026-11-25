@@ -33,10 +33,14 @@ async function buildAlertText() {
   const forecast = await getStockForecast();
   const { lowStock, soonOut } = splitForecastAlerts(forecast);
 
+  // Validade é gravada como meia-noite UTC do dia. Comparar com "agora"
+  // deixava de fora justamente o produto que vence hoje; o corte é o início
+  // do dia de hoje.
   const now = new Date();
+  const startOfToday = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
   const expiringUntil = new Date(Date.now() + config.expiryAlertDays * 24 * 60 * 60 * 1000);
   const expiring = await prisma.product.findMany({
-    where: { active: true, expiryDate: { not: null, gte: now, lte: expiringUntil } },
+    where: { active: true, expiryDate: { not: null, gte: startOfToday, lte: expiringUntil } },
     orderBy: { expiryDate: 'asc' },
   });
 
@@ -48,7 +52,7 @@ async function buildAlertText() {
     'Alerta diário de estoque - Mercadinho do João',
     section('Estoque abaixo do mínimo', lowStock, (p) => `- ${p.name}: ${p.currentStock} ${p.unit} (mínimo ${p.minStock})`),
     section('Previsão de esgotar em até 7 dias', soonOut, (p) => `- ${p.name}: previsão de acabar em ${p.daysUntilStockout} dia(s)`),
-    section('Produtos próximos do vencimento', expiring, (p) => `- ${p.name}: vence em ${p.expiryDate.toLocaleDateString('pt-BR')}`),
+    section('Produtos próximos do vencimento', expiring, (p) => `- ${p.name}: vence em ${p.expiryDate.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`),
   ]
     .filter(Boolean)
     .join('\n');
