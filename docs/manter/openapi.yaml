@@ -1,0 +1,1341 @@
+openapi: 3.0.3
+info:
+  title: Mercadinho do João - API
+  version: "1.0.0"
+  description: |
+    API de vendas e estoque do Mercadinho do João. Escrita a partir de `src/routes/*.js` no master de 25/11/2026 (commit 0df94d5).
+
+    - Sessão em cookie `mj_token` (JWT), definido por login ou auto-login. O cadastro público não abre sessão.
+    - Todo POST, PUT, PATCH e DELETE exige o cabeçalho `X-Requested-With: fetch` (defesa contra CSRF).
+    - Autorização por permissão (`src/permissions.js`): sales.viewAll, sales.cancel, reports.view, prices.manage,
+      products.manage, stock.manage. O dono (role ADMIN) tem todas e é o único com acesso a /users.
+      A permissão exigida aparece entre parênteses no resumo de cada operação.
+    - Erros sempre no formato `{ "error": "mensagem" }`.
+    - Valores `Decimal` do banco saem como `number`. Datas em ISO 8601 (UTC).
+servers:
+  - url: http://localhost:3100/api
+    description: Docker Compose local
+  - url: http://localhost:3000/api
+    description: npm run dev
+tags:
+  - name: auth
+  - name: products
+  - name: sales
+  - name: stock
+  - name: dashboard
+  - name: reports
+  - name: users
+  - name: imports
+
+security:
+  - sessionCookie: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Entrar com e-mail ou nome de usuário
+      description: Limite de 10 tentativas a cada 15 minutos por IP.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login:
+                  type: string
+                  maxLength: 255
+                  description: E-mail ou nome de usuário. O campo `email` é aceito como apelido.
+                  example: diego1239
+                password:
+                  type: string
+                  maxLength: 200
+      responses:
+        '200':
+          description: Sessão aberta; cookie `mj_token` definido.
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionUser' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '401':
+          description: '"Login incorreto." (usuário inexistente, ou conta desativada com senha errada) ou "Senha incorreta."'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: 'Conta desativada ou ainda não liberada pelo dono, com a senha certa: "Sua conta ainda não foi liberada, ou foi desativada. Fale com o dono do mercadinho."'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooMany' }
+
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Criar conta da equipe (auto-cadastro)
+      description: A conta nasce CASHIER, sem permissões extras e **desativada**, e nenhuma sessão é aberta. Só entra depois que o dono liga a conta (PUT /users/{id} com active true). Campos extras são recusados. Limite de 5 por hora por IP.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                email: { type: string, format: email, maxLength: 255 }
+                password: { type: string, minLength: 8, maxLength: 200 }
+      responses:
+        '201':
+          description: Conta criada, desativada e sem sessão (nenhum Set-Cookie).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, email, username, role, active, message]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  email: { type: string, format: email }
+                  username: { type: string }
+                  role: { type: string, enum: [CASHIER] }
+                  active: { type: boolean, enum: [false] }
+                  message: { type: string, example: 'Conta criada. Ela fica parada até o dono do mercadinho liberar o seu acesso.' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooMany' }
+
+  /auth/forgot-password:
+    post:
+      tags: [auth]
+      summary: Pedir link de nova senha
+      description: |
+        Resposta sempre igual, exista o e-mail ou não. O link (válido por PASSWORD_RESET_EXPIRES_MIN minutos, uso único)
+        vai por e-mail se houver SMTP; fora de produção também é escrito no log. Nunca sai na resposta HTTP.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 255 }
+      responses:
+        '200':
+          description: Mensagem genérica.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '429': { $ref: '#/components/responses/TooMany' }
+
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      summary: Definir nova senha com o token do link
+      description: Marca o token como usado, troca a senha e incrementa sessionVersion (derruba as sessões abertas).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string, minLength: 1, maxLength: 500 }
+                password: { type: string, minLength: 8, maxLength: 200 }
+      responses:
+        '200':
+          description: Senha redefinida.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Message' }
+        '400':
+          description: Validação ou "Link de recuperação inválido, expirado ou já utilizado."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooMany' }
+
+  /auth/auto-login:
+    post:
+      tags: [auth]
+      summary: Entrar com a conta de demonstração (só local)
+      description: Só funciona com AUTO_LOGIN_ENABLED=true fora de produção e com conta CASHIER sem permissões extras, configurada no servidor.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      responses:
+        '200':
+          description: Sessão aberta.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Auto-login desligado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Ligado, mas sem e-mail ou senha configurados.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Sair (apaga o cookie)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      responses:
+        '200':
+          description: Cookie apagado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Usuário da sessão atual
+      responses:
+        '200':
+          description: Usuário logado.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SessionUser'
+                  - type: object
+                    properties:
+                      active: { type: boolean }
+                      permissions:
+                        type: array
+                        description: Permissões efetivas (o dono recebe todas).
+                        items: { $ref: '#/components/schemas/PermissionKey' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /products:
+    get:
+      tags: [products]
+      summary: Listar produtos
+      description: |
+        Sem `page`/`pageSize`, devolve a lista inteira (array). Com qualquer um deles, devolve um objeto paginado.
+        Inativos (`includeInactive=true`) só para products.manage ou prices.manage. `costPrice` e `margin` só para prices.manage.
+      parameters:
+        - { name: query, in: query, schema: { type: string }, description: Parte do nome, ignorando acento e maiúsculas. }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: lowStock, in: query, schema: { type: string, enum: ['true'] } }
+        - { name: pricePending, in: query, schema: { type: string, enum: ['true'] }, description: Só produtos aguardando preço. }
+        - { name: includeInactive, in: query, schema: { type: string, enum: ['true'] } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Lista simples ou paginada.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  - type: object
+                    properties:
+                      totalCount: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      products:
+                        type: array
+                        items: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [products]
+      summary: Cadastrar produto (products.manage ou prices.manage)
+      description: |
+        Estoque inicial maior que zero gera movimentação ENTRY "Estoque inicial no cadastro".
+        Preços só com prices.manage (senão 403 "Só o dono ou o financeiro podem definir preços."). Sem preço, o produto nasce aguardando preço.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductCreate' }
+      responses:
+        '201':
+          description: Produto criado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [products]
+      summary: Detalhe do produto
+      responses:
+        '200':
+          description: Produto.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [products]
+      summary: Editar ou reativar produto (products.manage ou prices.manage)
+      description: O estoque não muda por aqui. `active=true` reativa. Campos de preço (inclusive null) só com prices.manage.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductUpdate' }
+      responses:
+        '200':
+          description: Produto atualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [products]
+      summary: Desativar produto (products.manage ou prices.manage)
+      description: Exclusão lógica; o histórico é mantido.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      responses:
+        '200':
+          description: Desativado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /sales:
+    post:
+      tags: [sales]
+      summary: Registrar venda
+      description: |
+        Preço e vendedor vêm do servidor. Baixa de estoque atômica; sem saldo, nada é gravado (409).
+        Produto aguardando preço não é vendido (409). Total máximo de R$ 5.000.000,00.
+        Quantidade com até 3 casas decimais; inteira para unidades fora de KG, G, L, LT, ML, M, MT; item que sairia por R$ 0,00 é recusado (400).
+        Os produtos são travados em ordem fixa antes de ler o saldo (sem impasse entre vendas simultâneas).
+        Com `Idempotency-Key`, repetir o mesmo carrinho devolve a venda já gravada (200) sem baixar o estoque de novo.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  description: Sem productId repetido.
+                  items:
+                    type: object
+                    required: [productId, quantity]
+                    properties:
+                      productId: { type: string, format: uuid }
+                      quantity: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 10000 }
+      responses:
+        '200':
+          description: Repetição com a mesma Idempotency-Key, mesmo usuário e mesmo carrinho; devolve a venda já gravada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleCreated' }
+        '201':
+          description: Venda registrada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SaleCreated' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Estoque insuficiente, produto aguardando preço, ou conflito raro entre duas confirmações.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Idempotency-Key já usada em outra venda (outro carrinho ou outro usuário).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [sales]
+      summary: Listar vendas não canceladas
+      description: Sempre paginado. Sem sales.viewAll, só as próprias. `canCancel` diz se quem pediu pode cancelar a venda agora.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Página de vendas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalCount: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+                  sales:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        seller: { type: string }
+                        totalAmount: { type: number }
+                        itemCount: { type: integer }
+                        createdAt: { type: string, format: date-time }
+                        canCancel: { type: boolean }
+        '400': { $ref: '#/components/responses/Validation' }
+
+  /sales/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [sales]
+      summary: Detalhe da venda
+      description: Sem sales.viewAll, 403 na venda de outra pessoa.
+      responses:
+        '200':
+          description: Venda com itens.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  seller: { type: string }
+                  totalAmount: { type: number }
+                  canceled: { type: boolean }
+                  createdAt: { type: string, format: date-time }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product: { type: string }
+                        quantity: { type: number }
+                        unitPrice: { type: number }
+                        subtotal: { type: number }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /sales/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [sales]
+      summary: Cancelar venda (sales.cancel, ou a própria venda até 10 minutos)
+      description: |
+        Com sales.cancel, qualquer venda. Sem, só a própria e até 10 minutos depois de criada (senão 403).
+        Devolve o estoque (movimentação ADJUSTMENT com o id da venda), inclusive de produto inativo.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      responses:
+        '200':
+          description: Cancelada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  canceled: { type: boolean, example: true }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Venda já cancelada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /stock/entries:
+    post:
+      tags: [stock]
+      summary: Entrada de mercadoria (stock.manage)
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId: { type: string, format: uuid }
+                quantity: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000000 }
+                reason: { type: string, maxLength: 255, nullable: true, description: 'Padrão: "Entrada de estoque (compra)".' }
+      responses:
+        '201': { $ref: '#/components/responses/StockResult' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /stock/adjustments:
+    post:
+      tags: [stock]
+      summary: Ajuste ou perda (stock.manage)
+      description: Quantidade com sinal. O estoque resultante precisa ficar entre 0 e 50.000.000.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity, reason]
+              properties:
+                productId: { type: string, format: uuid }
+                quantity: { type: number, minimum: -1000000, maximum: 1000000, description: Diferente de zero. }
+                reason: { type: string, minLength: 1, maxLength: 255 }
+                type: { type: string, enum: [ADJUSTMENT, LOSS], default: ADJUSTMENT }
+      responses:
+        '201': { $ref: '#/components/responses/StockResult' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /stock/movements:
+    get:
+      tags: [stock]
+      summary: Histórico de movimentações (stock.manage)
+      description: Sem paginação, as 200 mais recentes (array). Com page/pageSize, objeto paginado.
+      parameters:
+        - { name: productId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/MovementType'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Movimentações, mais recentes primeiro.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/Movement' }
+                  - type: object
+                    properties:
+                      totalCount: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+                      movements:
+                        type: array
+                        items: { $ref: '#/components/schemas/Movement' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /stock/movements/export:
+    get:
+      tags: [stock]
+      summary: Exportar movimentações (stock.manage)
+      description: Até 20.000 linhas mais recentes; se houver mais, uma última linha avisa o corte. O filtro `to` inclui o dia inteiro. Tipo em português.
+      parameters:
+        - { name: productId, in: query, schema: { type: string, format: uuid } }
+        - $ref: '#/components/parameters/MovementType'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200': { $ref: '#/components/responses/FileExport' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /dashboard:
+    get:
+      tags: [dashboard]
+      summary: Dados do Painel
+      description: Todos recebem os alertas. pricePending só com prices.manage; today, month e slowMoving só com reports.view.
+      responses:
+        '200':
+          description: Painel.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lowStock:
+                    type: array
+                    items: { $ref: '#/components/schemas/ForecastItem' }
+                  soonOut:
+                    type: array
+                    items: { $ref: '#/components/schemas/ForecastItem' }
+                  expiring:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        expiryDate: { type: string, format: date-time }
+                        currentStock: { type: number }
+                  pricePending:
+                    type: array
+                    description: Só com prices.manage.
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        createdAt: { type: string, format: date-time }
+                  today: { $ref: '#/components/schemas/Totals' }
+                  month: { $ref: '#/components/schemas/Totals' }
+                  slowMoving:
+                    type: array
+                    items: { $ref: '#/components/schemas/SlowMovingItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /reports/forecast:
+    get:
+      tags: [reports]
+      summary: Previsão de esgotamento (reports.view)
+      responses:
+        '200':
+          description: Produtos ativos, do que acaba antes para os sem previsão.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ForecastItem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/forecast/export:
+    get:
+      tags: [reports]
+      summary: Exportar previsão (reports.view)
+      parameters:
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200': { $ref: '#/components/responses/FileExport' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/sales-summary:
+    get:
+      tags: [reports]
+      summary: Resumo de vendas por dia (reports.view)
+      description: Vendas não canceladas. `to` inclui o dia inteiro. Chaves de byDay são dias UTC.
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Totais.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: number }
+                  count: { type: integer }
+                  byDay:
+                    type: object
+                    additionalProperties: { type: number }
+                    example: { '2026-11-23': 312.4 }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/sales-summary/export:
+    get:
+      tags: [reports]
+      summary: Exportar resumo por dia (reports.view)
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200': { $ref: '#/components/responses/FileExport' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/top-products:
+    get:
+      tags: [reports]
+      summary: Mais vendidos por faturamento (reports.view)
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: Ranking.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    productId: { type: string, format: uuid }
+                    name: { type: string }
+                    quantitySold: { type: number }
+                    revenue: { type: number }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/top-products/export:
+    get:
+      tags: [reports]
+      summary: Exportar mais vendidos (reports.view)
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200': { $ref: '#/components/responses/FileExport' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/slow-moving:
+    get:
+      tags: [reports]
+      summary: Produtos parados (reports.view)
+      parameters:
+        - $ref: '#/components/parameters/Days'
+      responses:
+        '200':
+          description: Produtos ativos com estoque e sem venda no período.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SlowMovingItem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/slow-moving/export:
+    get:
+      tags: [reports]
+      summary: Exportar produtos parados (reports.view)
+      parameters:
+        - $ref: '#/components/parameters/Days'
+        - $ref: '#/components/parameters/Format'
+      responses:
+        '200': { $ref: '#/components/responses/FileExport' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/email:
+    post:
+      tags: [reports]
+      summary: Enviar o relatório do período por e-mail (reports.view)
+      description: |
+        Resumo no corpo e um XLSX com as abas Resumo, Vendas por dia, Mais vendidos (50), Produtos parados (60 dias)
+        e Previsão de estoque. Usa o SMTP do .env. Limite de 10 envios a cada 15 minutos por IP.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 255 }
+                from: { type: string, format: date, description: AAAA-MM-DD }
+                to: { type: string, format: date, description: AAAA-MM-DD; inclui o dia inteiro. }
+      responses:
+        '200':
+          description: Enviado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  sentTo: { type: string, format: email }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooMany' }
+        '502':
+          description: O servidor SMTP recusou ou não respondeu.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: SMTP não configurado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /users/permissions:
+    get:
+      tags: [users]
+      summary: Lista de permissões e tipos de pessoa (dono)
+      description: Usada pelo formulário de usuários para montar as caixinhas e os modelos Financeiro, Estoque e Caixa.
+      responses:
+        '200':
+          description: Permissões e modelos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  permissions:
+                    type: object
+                    description: Chave da permissão e o texto mostrado na tela.
+                    additionalProperties: { type: string }
+                    example: { 'sales.viewAll': Ver as vendas de todos }
+                  templates:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        label: { type: string }
+                        permissions:
+                          type: array
+                          items: { $ref: '#/components/schemas/PermissionKey' }
+                    example:
+                      estoque: { label: Estoque, permissions: [products.manage, stock.manage] }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /users:
+    get:
+      tags: [users]
+      summary: Listar contas (dono)
+      responses:
+        '200':
+          description: Contas por nome.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/User' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [users]
+      summary: Criar conta da equipe (dono)
+      description: Sempre CASHIER; `role` enviado é ignorado. Permissão fora da lista dá 400.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                email: { type: string, format: email, maxLength: 255 }
+                password: { type: string, minLength: 8, maxLength: 200 }
+                permissions:
+                  type: array
+                  default: []
+                  items: { $ref: '#/components/schemas/PermissionKey' }
+      responses:
+        '201':
+          description: Conta criada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [users]
+      summary: Editar conta (dono)
+      description: Trocar a senha incrementa sessionVersion. Permissões valem na próxima requisição da pessoa. O dono não pode desativar a si mesmo (400).
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                active: { type: boolean }
+                password: { type: string, minLength: 8, maxLength: 200 }
+                permissions:
+                  type: array
+                  items: { $ref: '#/components/schemas/PermissionKey' }
+      responses:
+        '200':
+          description: Conta atualizada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /imports/products/template:
+    get:
+      tags: [imports]
+      summary: Baixar modelo de planilha (prices.manage)
+      responses:
+        '200':
+          description: modelo-produtos.xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /imports/products/parse:
+    post:
+      tags: [imports]
+      summary: Ler planilha ou texto colado, sem gravar (prices.manage)
+      description: Arquivo .xlsx, .xlsm, .csv, .txt ou .tsv até 5 MB; até 1.000 linhas e 40 colunas.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 2000000 }
+      responses:
+        '200':
+          description: Grade e palpite das colunas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  headers:
+                    type: array
+                    items: { type: string }
+                  rows:
+                    type: array
+                    items:
+                      type: array
+                      items: { $ref: '#/components/schemas/Cell' }
+                  mapping: { $ref: '#/components/schemas/ImportMapping' }
+                  fields:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key: { type: string }
+                        label: { type: string }
+                        required: { type: boolean }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /imports/products/preview:
+    post:
+      tags: [imports]
+      summary: Montar o plano da importação, sem gravar (prices.manage)
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportGrid' }
+      responses:
+        '200':
+          description: Plano linha a linha.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: object
+                    properties:
+                      create: { type: integer }
+                      update: { type: integer }
+                      skip: { type: integer }
+                      error: { type: integer }
+                      total: { type: integer }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        line: { type: integer, description: Linha na planilha (1 = cabeçalho). }
+                        action: { type: string, enum: [create, update, skip, error] }
+                        values: { type: object }
+                        errors:
+                          type: array
+                          items: { type: string }
+                        warnings:
+                          type: array
+                          items: { type: string }
+                        reason: { type: string }
+                        productId: { type: string, format: uuid }
+                        productName: { type: string }
+                        before: { type: object }
+                        stockDelta: { type: number }
+                        resultingStock: { type: number }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /imports/products/commit:
+    post:
+      tags: [imports]
+      summary: Gravar a importação (prices.manage)
+      description: Refaz a análise e grava uma transação por linha.
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportGrid' }
+      responses:
+        '200':
+          description: Resultado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                  updated: { type: integer }
+                  skipped: { type: integer }
+                  failed: { type: integer }
+                  failures:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        line: { type: integer }
+                        name: { type: string }
+                        error: { type: string }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: mj_token
+      description: JWT HS256, issuer mercadinho-joao-api, audience mercadinho-joao-web, validade 8 h. Revalidado no banco a cada requisição.
+
+  parameters:
+    XRequestedWith:
+      name: X-Requested-With
+      in: header
+      required: true
+      description: Defesa contra CSRF. Obrigatório em POST, PUT, PATCH e DELETE.
+      schema: { type: string, enum: [fetch] }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    From:
+      name: from
+      in: query
+      schema: { type: string, format: date }
+      example: '2026-11-01'
+    To:
+      name: to
+      in: query
+      schema: { type: string, format: date }
+      example: '2026-11-30'
+    Format:
+      name: format
+      in: query
+      schema: { type: string, enum: [csv, xlsx], default: csv }
+    Days:
+      name: days
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 365, default: 60 }
+    MovementType:
+      name: type
+      in: query
+      schema: { type: string, enum: [ENTRY, SALE, ADJUSTMENT, LOSS] }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Chave por carrinho. Repetir a mesma chave com o mesmo carrinho devolve a venda já gravada.
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,100}$' }
+
+  responses:
+    Validation:
+      description: Dados inválidos ou regra de negócio violada.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Sem sessão válida.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Sem X-Requested-With, ou sem a permissão exigida.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Não encontrado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Já cadastrado (e-mail ou código de barras).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    TooMany:
+      description: Limite de tentativas.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    StockResult:
+      description: Estoque atualizado.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              productId: { type: string, format: uuid }
+              currentStock: { type: number }
+    FileExport:
+      description: Planilha para download (Content-Disposition attachment). CSV com ponto e vírgula, UTF-8 com BOM.
+      content:
+        text/csv:
+          schema: { type: string }
+        application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+          schema: { type: string, format: binary }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: Sem permissão para executar esta ação. }
+        details:
+          type: object
+          description: Só em erro de validação do corpo (formato flatten do Zod).
+    Message:
+      type: object
+      properties:
+        message: { type: string }
+    SessionUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        username: { type: string, example: diego1239 }
+        role: { type: string, enum: [ADMIN, CASHIER] }
+    PermissionKey:
+      type: string
+      enum: [sales.viewAll, sales.cancel, reports.view, prices.manage, products.manage, stock.manage]
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        username: { type: string }
+        role: { type: string, enum: [ADMIN, CASHIER] }
+        permissions:
+          type: array
+          description: Lista gravada (para ADMIN costuma vir vazia; o dono tem todas de qualquer forma).
+          items: { $ref: '#/components/schemas/PermissionKey' }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    SaleCreated:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        totalAmount: { type: number }
+        createdAt: { type: string, format: date-time }
+        itemCount: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product: { type: string }
+              unit: { type: string }
+              quantity: { type: number }
+              unitPrice: { type: number }
+              subtotal: { type: number }
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        barcode: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        unit: { type: string, example: UN }
+        salePrice: { type: number, nullable: true, description: null = aguardando preço. }
+        pricePending: { type: boolean, description: true se salePrice ou costPrice for null; não pode ser vendido. }
+        currentStock: { type: number }
+        minStock: { type: number }
+        expiryDate: { type: string, format: date-time, nullable: true }
+        active: { type: boolean }
+        costPrice: { type: number, nullable: true, description: Só para prices.manage. }
+        margin: { type: number, nullable: true, description: Só para prices.manage (salePrice - costPrice; null se aguardando preço). }
+    ProductCreate:
+      type: object
+      required: [name]
+      description: Campos de preço só com prices.manage. Sem eles, o produto nasce aguardando preço.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        barcode: { type: string, maxLength: 64, nullable: true }
+        category: { type: string, maxLength: 80, nullable: true }
+        unit: { type: string, minLength: 1, maxLength: 10, default: UN }
+        costPrice: { type: number, minimum: 0, maximum: 1000000, nullable: true }
+        salePrice: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000000, nullable: true }
+        minStock: { type: number, minimum: 0, maximum: 1000000, default: 0 }
+        initialStock: { type: number, minimum: 0, maximum: 1000000, default: 0 }
+        expiryDate: { type: string, format: date, nullable: true, description: AAAA-MM-DD, data que existe no calendário. }
+    ProductUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        barcode: { type: string, maxLength: 64, nullable: true }
+        category: { type: string, maxLength: 80, nullable: true }
+        unit: { type: string, minLength: 1, maxLength: 10 }
+        costPrice: { type: number, minimum: 0, maximum: 1000000, nullable: true, description: Só com prices.manage. }
+        salePrice: { type: number, exclusiveMinimum: true, minimum: 0, maximum: 1000000, nullable: true, description: Só com prices.manage. }
+        minStock: { type: number, minimum: 0, maximum: 1000000 }
+        expiryDate: { type: string, format: date, nullable: true }
+        active: { type: boolean }
+    Movement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        product: { type: string, description: Nome do produto. }
+        type: { type: string, enum: [ENTRY, SALE, ADJUSTMENT, LOSS] }
+        quantity: { type: number, description: Com sinal. }
+        previousStock: { type: number }
+        newStock: { type: number }
+        reason: { type: string, nullable: true }
+        user: { type: string, description: Nome de quem fez. }
+        createdAt: { type: string, format: date-time }
+    ForecastItem:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        name: { type: string }
+        unit: { type: string }
+        currentStock: { type: number }
+        minStock: { type: number }
+        avgDailySales: { type: number }
+        daysUntilStockout: { type: number, nullable: true }
+        lowStock: { type: boolean }
+    SlowMovingItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        currentStock: { type: number }
+        capitalParado: { type: number, description: currentStock × costPrice }
+    Totals:
+      type: object
+      description: Só com reports.view.
+      properties:
+        total: { type: number }
+        count: { type: integer }
+    Cell:
+      nullable: true
+      oneOf:
+        - { type: string, maxLength: 500 }
+        - { type: number }
+        - { type: boolean }
+    ImportMapping:
+      type: object
+      description: Índice (a partir de 0) da coluna de cada campo. `name` é obrigatório no preview e no commit.
+      properties:
+        name: { type: integer, minimum: 0, maximum: 39 }
+        barcode: { type: integer, minimum: 0, maximum: 39 }
+        category: { type: integer, minimum: 0, maximum: 39 }
+        unit: { type: integer, minimum: 0, maximum: 39 }
+        costPrice: { type: integer, minimum: 0, maximum: 39 }
+        salePrice: { type: integer, minimum: 0, maximum: 39 }
+        stock: { type: integer, minimum: 0, maximum: 39 }
+        minStock: { type: integer, minimum: 0, maximum: 39 }
+        expiryDate: { type: integer, minimum: 0, maximum: 39 }
+    ImportGrid:
+      type: object
+      required: [headers, rows, mapping]
+      properties:
+        headers:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items: { type: string, maxLength: 200 }
+        rows:
+          type: array
+          maxItems: 1000
+          items:
+            type: array
+            maxItems: 40
+            items: { $ref: '#/components/schemas/Cell' }
+        mapping: { $ref: '#/components/schemas/ImportMapping' }
+        options:
+          type: object
+          properties:
+            mode: { type: string, enum: [upsert, createOnly, updateOnly], default: upsert }
+            matchBy: { type: string, enum: [barcode, name], default: barcode }
+            stockMode: { type: string, enum: [ignore, set, add], default: ignore }

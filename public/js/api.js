@@ -52,6 +52,14 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('pt-BR');
 }
 
+// Datas sem hora (validade) são gravadas como meia-noite UTC do dia. Lidas no
+// fuso local, meia-noite UTC do dia 26 vira 21h do dia 25 em Brasília e a
+// validade aparecia um dia antes. Por isso são sempre mostradas em UTC.
+function formatDateOnly(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
+
 function formatDateTime(value) {
   if (!value) return '—';
   return new Date(value).toLocaleString('pt-BR');

@@ -1,4 +1,8 @@
 process.env.NODE_ENV = 'test';
+// O limite geral (300 requisições/min por IP) protege a loja, mas a suíte
+// inteira roda do mesmo IP em segundos: passados ~300 pedidos, os testes do
+// fim começavam a levar 429. Vale só aqui; produção segue com o padrão.
+process.env.API_RATE_LIMIT_MAX = process.env.API_RATE_LIMIT_MAX_TEST || '100000';
 // Testes de integração de regressão: rodam contra um PostgreSQL real (não
 // mocks) e sobem a aplicação de verdade na memória, exatamente como ela
 // roda em produção. Protegem especificamente contra os bugs mais graves
@@ -92,6 +96,10 @@ test('login: aceita o nome de usuário gerado no cadastro', async () => {
   assert.equal(register.status, 201);
   // Primeiro nome, minúsculo e sem acento, seguido de 4 dígitos.
   assert.match(register.body.username, /^joaquim\d{4}$/);
+
+  // A conta do cadastro público nasce desativada; o dono liga em Usuários.
+  const activate = await request(baseUrl, adminJar, `/api/users/${register.body.id}`, { method: 'PUT', body: { active: true } });
+  assert.equal(activate.status, 200);
 
   // O login pelo e-mail continua coberto pelos demais testes (todos entram por e-mail).
   const byUsername = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
@@ -1275,4 +1283,130 @@ test('exportação: histórico do estoque sai com o tipo em português', async (
   const csv = await res.text();
   assert.match(csv, /Produto Exporta Tipo;Entrada;/);
   assert.doesNotMatch(csv, /;ENTRY;/);
+});
+
+// Validade é data sem hora, gravada como meia-noite UTC. Lida no fuso local
+// ela aparecia um dia antes, e o alerta diário (que comparava com "agora")
+// pulava justamente o produto que vence hoje.
+test('validade: alerta diário inclui o produto que vence hoje, com a data certa', async () => {
+  const { buildAlertText } = require('../src/jobs/dailyAlerts');
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const todayBr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+
+  const created = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Iogurte Zvalidade Hoje', unit: 'UN', costPrice: 1, salePrice: 2, expiryDate: todayKey },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.expiryDate.slice(0, 10), todayKey, 'a API devolve o dia gravado');
+
+  const text = await buildAlertText();
+  assert.ok(text, 'deveria haver alerta');
+  assert.match(text, new RegExp(`- Iogurte Zvalidade Hoje: vence em ${todayBr.replace(/\//g, '\/')}`));
+});
+
+// A conferência mostra preço e estoque em colunas; o resto que a planilha muda
+// num produto existente precisa aparecer nas observações. Sem isso, uma linha
+// com o mesmo código de barras e outro nome renomeava o produto em silêncio.
+test('importação: conferência avisa troca de nome, mínimo, categoria e validade vencida', async () => {
+  const created = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Arroz Zconferencia 5kg', barcode: '7890000000777', category: 'Mercearia', unit: 'PCT', costPrice: 18, salePrice: 24, minStock: 10 },
+  });
+  assert.equal(created.status, 201);
+
+  const rows = [
+    ['Arroz Zconferencia 5kg (repetido)', '7890000000777', 'Grãos', 'PCT', '18,00', '24,00', '', '5', ''],
+    ['Iogurte Zconferencia', '7890000000778', 'Laticínios', 'UN', '1,00', '2,00', '3', '1', '01/01/2020'],
+    ['Arroz Zconferencia Igual', '7890000000779', 'Mercearia', 'UN', '1,00', '2,00', '', '0', ''],
+  ];
+  const preview = await request(baseUrl, adminJar, '/api/imports/products/preview', { method: 'POST', body: importBody(rows) });
+  assert.equal(preview.status, 200);
+  const [rename, expired, fresh] = preview.body.items;
+
+  assert.equal(rename.action, 'update');
+  assert.ok(rename.warnings.includes('Nome muda de "Arroz Zconferencia 5kg" para "Arroz Zconferencia 5kg (repetido)".'), JSON.stringify(rename.warnings));
+  assert.ok(rename.warnings.includes('Estoque mínimo: 10 → 5.'));
+  assert.ok(rename.warnings.includes('Categoria: Mercearia → Grãos.'));
+  assert.ok(!rename.warnings.some((w) => w.startsWith('Unidade')), 'unidade igual não vira aviso');
+
+  assert.equal(expired.action, 'create');
+  assert.ok(expired.warnings.includes('Validade 01/01/2020 já passou.'));
+
+  assert.equal(fresh.action, 'create');
+  assert.deepEqual(fresh.warnings, [], 'produto novo sem nada de estranho não ganha aviso');
+});
+
+test('exportação: movimentações saem com data e hora de Brasília e o tipo em português', async () => {
+  const product = await request(baseUrl, adminJar, '/api/products', {
+    method: 'POST',
+    body: { name: 'Produto Zexport Mov', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 4 },
+  });
+  const res = await fetch(`${baseUrl}/api/stock/movements/export?format=csv&productId=${product.body.id}`, {
+    headers: { Cookie: adminJar.header(), 'X-Requested-With': 'fetch' },
+  });
+  assert.equal(res.status, 200);
+  const line = (await res.text()).split('\r\n')[1];
+  assert.match(line, /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2};Produto Zexport Mov;Entrada;4;0;4;/);
+
+  const expected = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
+  assert.ok(line.startsWith(expected), `data esperada em Brasília: ${expected}, veio: ${line.slice(0, 16)}`);
+
+  // No Excel a mesma coluna é data de verdade, e não texto: só assim ordena e
+  // filtra por data (em texto, "01/12" vinha antes de "25/11").
+  const xlsx = await fetch(`${baseUrl}/api/stock/movements/export?format=xlsx&productId=${product.body.id}`, {
+    headers: { Cookie: adminJar.header(), 'X-Requested-With': 'fetch' },
+  });
+  assert.equal(xlsx.status, 200);
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(await xlsx.arrayBuffer()));
+  const cell = workbook.worksheets[0].getCell('A2');
+  assert.ok(cell.value instanceof Date, `Data/Hora deveria ser data no Excel, veio ${typeof cell.value}: ${cell.value}`);
+  assert.equal(cell.numFmt, 'dd/mm/yyyy hh:mm');
+  const [dia, mes, ano] = expected.split('/');
+  assert.equal(cell.value.toISOString().slice(0, 10), `${ano}-${mes}-${dia}`, 'o dia no Excel é o de Brasília');
+});
+
+// Com o sistema na internet, o cadastro público não pode dar acesso sozinho:
+// a conta nasce desativada e sem sessão, até o dono ligar em Usuários.
+test('cadastro público: conta nasce desativada, sem sessão, e só entra depois que o dono libera', async () => {
+  const jar = makeCookieJar();
+  const register = await request(baseUrl, jar, '/api/auth/register', {
+    method: 'POST',
+    body: { name: 'Pessoa Zpendente', email: 'pessoa.pendente@example.com', password: 'SenhaPendente123!' },
+  });
+  assert.equal(register.status, 201);
+  assert.equal(register.body.active, false);
+  assert.match(register.body.message, /dono do mercadinho liberar/);
+  assert.doesNotMatch(jar.header(), /mj_token=/, 'o cadastro não pode abrir sessão');
+  assert.equal((await request(baseUrl, jar, '/api/products')).status, 401);
+
+  // Senha certa: mensagem própria. Senha errada: a mesma resposta de sempre.
+  const pending = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
+    method: 'POST',
+    body: { login: 'pessoa.pendente@example.com', password: 'SenhaPendente123!' },
+  });
+  assert.equal(pending.status, 403);
+  assert.match(pending.body.error, /ainda não foi liberada/);
+  const wrong = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
+    method: 'POST',
+    body: { login: 'pessoa.pendente@example.com', password: 'SenhaErrada123!' },
+  });
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.body.error, 'Login incorreto.', 'sem a senha certa, não pode revelar que a conta existe e está parada');
+
+  const users = await request(baseUrl, adminJar, '/api/users');
+  const listed = users.body.find((u) => u.email === 'pessoa.pendente@example.com');
+  assert.equal(listed.active, false, 'o dono vê a conta desativada em Usuários');
+  const activate = await request(baseUrl, adminJar, `/api/users/${listed.id}`, { method: 'PUT', body: { active: true } });
+  assert.equal(activate.status, 200);
+
+  const allowed = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
+    method: 'POST',
+    body: { login: 'pessoa.pendente@example.com', password: 'SenhaPendente123!' },
+  });
+  assert.equal(allowed.status, 200);
 });

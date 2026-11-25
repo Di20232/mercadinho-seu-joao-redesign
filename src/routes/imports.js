@@ -58,6 +58,35 @@ function decimal(value, places) {
   return Number(value).toFixed(places);
 }
 
+const brDay = (isoDay) => isoDay.split('-').reverse().join('/');
+const brNumber = (value) => Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+
+// O que a linha muda num produto existente, além de preço e estoque (que a
+// conferência já mostra em colunas próprias). Só entram os campos que a
+// planilha trouxe e que de fato mudam.
+function describeChanges(product, values) {
+  const changes = [];
+  if (values.name !== undefined && values.name !== product.name) {
+    changes.push(`Nome muda de "${product.name}" para "${values.name}".`);
+  }
+  if (values.category !== undefined && (values.category || null) !== (product.category || null)) {
+    changes.push(`Categoria: ${product.category || '(nenhuma)'} → ${values.category || '(nenhuma)'}.`);
+  }
+  if (values.unit !== undefined && values.unit !== product.unit) {
+    changes.push(`Unidade: ${product.unit} → ${values.unit}.`);
+  }
+  if (values.minStock !== undefined && Number(values.minStock) !== Number(product.minStock)) {
+    changes.push(`Estoque mínimo: ${brNumber(product.minStock)} → ${brNumber(values.minStock)}.`);
+  }
+  if (values.expiryDate !== undefined) {
+    const current = product.expiryDate ? product.expiryDate.toISOString().slice(0, 10) : null;
+    if (current !== values.expiryDate) {
+      changes.push(`Validade: ${current ? brDay(current) : '(sem validade)'} → ${brDay(values.expiryDate)}.`);
+    }
+  }
+  return changes;
+}
+
 // Monta o plano de importação: para cada linha, o que será feito (criar,
 // atualizar, ignorar) e por quê. Nada é gravado aqui — é exatamente esta
 // função que alimenta tanto a tela de conferência quanto a gravação, para que
@@ -152,6 +181,11 @@ async function analyze({ rows, mapping, options }) {
       item.productId = match.id;
       item.productName = match.name;
       if (!match.active) item.warnings.push('Produto está inativo — a importação atualiza os dados, mas ele segue fora das vendas.');
+
+      // A conferência mostra preço e estoque em colunas próprias; o resto que
+      // a linha muda (inclusive o nome) vira observação, para o dono não
+      // descobrir depois que um produto foi renomeado pela planilha.
+      item.warnings.push(...describeChanges(match, values));
 
       const currentStock = Number(match.currentStock);
       item.before = {

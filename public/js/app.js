@@ -187,11 +187,13 @@ function dayKey(offsetDays) {
   return new Date(Date.now() - offsetDays * 86400000).toISOString().slice(0, 10);
 }
 
+// Dias entre hoje (no fuso de quem usa) e uma data sem hora gravada como
+// meia-noite UTC (ver formatDateOnly). O dia da validade é lido em UTC.
 function daysFromToday(value) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(value);
-  target.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const d = new Date(value);
+  const target = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
   return Math.round((target - today) / 86400000);
 }
 
@@ -296,7 +298,7 @@ async function renderDashboard() {
     return el('li', {}, [
       el('div', { class: 'item-main' }, [
         el('span', { class: 'item-name' }, p.name),
-        el('span', { class: 'item-meta' }, `Validade ${formatDate(p.expiryDate)} · estoque ${p.currentStock}`),
+        el('span', { class: 'item-meta' }, `Validade ${formatDateOnly(p.expiryDate)} · estoque ${p.currentStock}`),
       ]),
       el('span', { class: 'item-side' }, el('span', { class: `badge ${days <= 0 ? 'bad' : 'info'}` }, label)),
     ]);
@@ -721,9 +723,9 @@ function renderPager(containerId, { page, pageSize, totalCount }, onPage) {
 function expiryBadge(value) {
   if (!value) return el('span', { class: 'muted' }, '—');
   const days = daysFromToday(value);
-  if (days < 0) return el('span', { class: 'badge bad', title: 'Produto vencido' }, formatDate(value));
-  if (days <= 7) return el('span', { class: 'badge warn', title: `Vence em ${days} dia(s)` }, formatDate(value));
-  return el('span', {}, formatDate(value));
+  if (days < 0) return el('span', { class: 'badge bad', title: 'Produto vencido' }, formatDateOnly(value));
+  if (days <= 7) return el('span', { class: 'badge warn', title: `Vence em ${days} dia(s)` }, formatDateOnly(value));
+  return el('span', {}, formatDateOnly(value));
 }
 
 async function loadProducts() {
