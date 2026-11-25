@@ -6,6 +6,15 @@
   <title>Mercadinho do João — Entrar</title>
   <link rel="preload" href="/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#15803d" />
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Mercadinho" />
+  <script src="/js/pwa.js" defer></script>
   <script src="/js/theme.js"></script>
 </head>
 <body>
@@ -60,6 +69,19 @@
         <div class="login-links">
           <a href="/recuperar-senha.html" class="link-action">Esqueci minha senha</a>
           <a href="/cadastro.html" class="link-action">Criar conta</a>
+        </div>
+
+        <div class="install-card" data-instalar hidden>
+          <img class="install-icon" src="/icons/icon-192.png" alt="" width="40" height="40" />
+          <div class="install-body">
+            <strong class="install-title">Instale o Mercadinho no celular</strong>
+            <p class="install-text"></p>
+            <div class="install-actions">
+              <button type="button" class="install-go">Instalar app</button>
+              <button type="button" class="secondary install-copy" hidden>Copiar link</button>
+              <button type="button" class="ghost install-later">Agora não</button>
+            </div>
+          </div>
         </div>
       </form>
     </main>

@@ -1,3 +1,4 @@
+const { Prisma } = require('@prisma/client');
 const httpError = require('./httpError');
 
 // Bem abaixo da capacidade da coluna Decimal(12,3) (~999.999.999,999) —
@@ -44,4 +45,24 @@ async function applyStockDelta(tx, productId, quantity, { notFoundMessage = 'Pro
   return { updated, previousStock, newStock: newStock.toFixed(3) };
 }
 
-module.exports = { MAX_STOCK, applyStockDelta };
+// Trava as linhas de vários produtos de uma vez, SEMPRE na mesma ordem (a do
+// próprio banco, por id), antes de a transação mexer em qualquer uma delas.
+//
+// Sem isso, a venda travava os produtos na ordem do carrinho: uma venda
+// travava o arroz e esperava o feijão enquanto outra, ao mesmo tempo, travava
+// o feijão e esperava o arroz. O PostgreSQL acusava deadlock, derrubava uma
+// das duas e o caixa recebia erro 500 (5 vezes no teste de carga de
+// 24/11/2026, e possível na loja com só dois caixas). Com todo mundo pedindo
+// as travas na mesma ordem, um espera o outro terminar e o impasse não existe.
+//
+// Toda rota que mexe em mais de um produto na mesma transação (venda e
+// cancelamento de venda) chama isto primeiro, pela MESMA consulta: a ordem é
+// definida pelo banco, então não depende de como o JavaScript ordena textos.
+// Como as linhas ficam travadas até o fim da transação, uma leitura feita
+// depois disto enxerga o saldo de verdade, que ninguém mais consegue mudar.
+async function lockProducts(tx, productIds) {
+  if (productIds.length === 0) return;
+  await tx.$queryRaw`SELECT id FROM "Product" WHERE id IN (${Prisma.join(productIds)}) ORDER BY id FOR UPDATE`;
+}
+
+module.exports = { MAX_STOCK, applyStockDelta, lockProducts };
