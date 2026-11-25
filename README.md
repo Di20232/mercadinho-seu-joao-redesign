@@ -2,6 +2,8 @@
 
 Um sistema moderno e seguro de controle de vendas e estoque para pequenos comércios, desenvolvido com Node.js, Express, PostgreSQL e JavaScript vanilla.
 
+> **Documentação completa em [`docs/`](docs/README.md)**: como usar (manual, FAQ, treinamento), como funciona (arquitetura, ADRs, dados, API em OpenAPI), como manter no ar (deploy, runbooks, backup, segurança) e como evoluir (dependências, dívida técnica, changelog, migrações). Onde este README e `docs/` discordarem, vale `docs/`.
+
 ## 📋 Características Principais
 
 ### 🔐 Segurança em Primeiro Lugar
