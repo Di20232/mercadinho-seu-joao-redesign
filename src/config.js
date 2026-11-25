@@ -19,6 +19,12 @@ function intEnv(name, fallback, min = 1) {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Endereço público do sistema. No Render, quem não definir APP_BASE_URL usa o
+// endereço que o próprio Render cria (RENDER_EXTERNAL_URL, ex.:
+// https://mercadinho-do-joao.onrender.com), e o deploy não depende de
+// adivinhar o nome antes de criar o serviço.
+const publicBaseUrl = process.env.APP_BASE_URL || process.env.RENDER_EXTERNAL_URL || '';
+
 const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: intEnv('PORT', 3000),
@@ -57,7 +63,7 @@ const config = {
   // URL base do app, usada para montar o link de reset de senha. Lida do .env
   // em vez de req.headers.host para evitar host header injection — um atacante
   // que controle o cabeçalho Host faria o e-mail/link apontar para domínio dele.
-  appBaseUrl: (process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, ''),
+  appBaseUrl: (publicBaseUrl || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, ''),
   // Validade do token de reset (em minutos). 30 min equilibra tempo razoável
   // para o usuário digitar a nova senha com janela pequena de abuso.
   passwordResetExpiresMin: intEnv('PASSWORD_RESET_EXPIRES_MIN', 30, 1),
@@ -87,7 +93,7 @@ if (config.nodeEnv === 'production' && config.jwtSecret.startsWith('dev-only')) 
 // Sem APP_BASE_URL o link do e-mail de "esqueci minha senha" sairia como
 // http://localhost:PORT — o e-mail chega, mas o link não abre para ninguém.
 // Melhor recusar subir do que falhar em silêncio na mão do cliente.
-if (config.nodeEnv === 'production' && !/^https?:\/\/(?!localhost\b|127\.0\.0\.1\b)/.test(process.env.APP_BASE_URL || '')) {
+if (config.nodeEnv === 'production' && !/^https?:\/\/(?!localhost\b|127\.0\.0\.1\b)/.test(publicBaseUrl)) {
   throw new Error('APP_BASE_URL ausente ou apontando para localhost em produção. Defina o endereço público do sistema (ex.: https://mercadinho.onrender.com).');
 }
 

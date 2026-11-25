@@ -1,0 +1,40 @@
+# Blueprint do Render: cria o serviço web do Mercadinho a partir do master.
+# No painel do Render: New > Blueprint > este repositório. Os campos com
+# "sync: false" são pedidos na criação e colados direto no painel (nunca no git).
+services:
+  - type: web
+    name: mercadinho-do-joao
+    runtime: node
+    plan: free            # dorme depois de ~15 min parado; "starter" não dorme
+    region: virginia      # a mais perto do Brasil; crie o banco no Neon em AWS us-east-1
+    branch: master
+    autoDeploy: true      # cada merge no master publica sozinho
+    # --include=dev: o prisma é devDependency (ADR-0013). O seed só cria o dono
+    # se ainda não existir nenhum, então rodar a cada deploy não faz nada depois
+    # do primeiro; sem ADMIN_EMAIL, ele é pulado.
+    buildCommand: npm ci --include=dev && npx prisma migrate deploy && if [ -n "$ADMIN_EMAIL" ]; then npm run seed; fi
+    startCommand: node src/server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: TZ                     # "hoje", "no mês" e o horário do e-mail em Brasília
+        value: America/Sao_Paulo
+      - key: TRUST_PROXY            # um proxy (o do Render) na frente
+        value: "1"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: LOW_STOCK_ALERT_HOUR
+        value: "8"
+      - key: DATABASE_URL           # string de conexão DIRETA do Neon, com ?sslmode=require
+        sync: false
+      - key: ADMIN_NAME             # primeiro acesso: o dono criado no build
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD         # apague depois do primeiro deploy
+        sync: false
+      # APP_BASE_URL é opcional: sem ela vale o endereço do Render
+      # (RENDER_EXTERNAL_URL). Defina só ao trocar para domínio próprio.
