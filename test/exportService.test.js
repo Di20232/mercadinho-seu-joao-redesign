@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { generateCsv } = require('../src/exportService');
+const ExcelJS = require('exceljs');
+const { generateCsv, generateXlsx, storeDateTime, XLSX_DATE_TIME_FORMAT } = require('../src/exportService');
 
 // Lê o CSV como o Excel faria: ";" separa colunas, aspas protegem o conteúdo.
 function parseCsv(text) {
@@ -39,4 +40,22 @@ test('CSV: fórmulas continuam neutralizadas e números ficam com vírgula', () 
   assert.equal(rows[1][1], '1,5');
   assert.equal(rows[2][0], "'@SUM(A1)");
   assert.equal(rows[2][1], '-4');
+});
+
+// 01:30 UTC do dia 26 é 22:30 do dia 25 em Brasília: a venda é do dia 25.
+const VENDA_DA_NOITE = new Date('2026-11-26T01:30:00Z');
+
+test('CSV: data e hora saem em texto, no horário da loja', () => {
+  const rows = parseCsv(generateCsv(['Data/Hora', 'Produto'], [[storeDateTime(VENDA_DA_NOITE), 'Arroz']]).replace(/^﻿/, ''));
+  assert.deepEqual(rows[1], ['25/11/2026 22:30', 'Arroz']);
+});
+
+test('Excel: data e hora continuam sendo data (ordena e filtra), no horário da loja', async () => {
+  const buffer = await generateXlsx('Movimentações', ['Data/Hora', 'Produto'], [[storeDateTime(VENDA_DA_NOITE), 'Arroz']]);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const cell = workbook.worksheets[0].getCell('A2');
+  assert.ok(cell.value instanceof Date, `a célula deveria ser data, veio ${typeof cell.value}: ${cell.value}`);
+  assert.equal(cell.value.toISOString(), '2026-11-25T22:30:00.000Z');
+  assert.equal(cell.numFmt, XLSX_DATE_TIME_FORMAT);
 });

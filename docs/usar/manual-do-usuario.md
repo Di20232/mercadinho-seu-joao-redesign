@@ -52,10 +52,11 @@ Endereço inicial do sistema. Informe o **e-mail** ou o **nome de usuário** e a
 - Se já houver uma sessão aberta no navegador, a tela pula direto para o sistema.
 - A sessão dura **8 horas**. Depois disso o sistema pede para entrar de novo.
 - Depois de 10 tentativas erradas em 15 minutos, a tela bloqueia novas tentativas por alguns minutos.
+- Conta ainda não liberada pelo dono, ou desligada por ele: com a senha certa, aparece "Sua conta ainda não foi liberada, ou foi desativada. Fale com o dono do mercadinho." Com a senha errada, aparece só "Login incorreto."
 
 ### Criar conta
 
-Link "Criar conta" na tela de entrada. Pede nome, e-mail, senha (mínimo de 8 caracteres) e a confirmação. A conta nasce como **caixa** (só vende) e já entra no sistema. Para ganhar outras permissões, o dono marca em Usuários. Limite de 5 cadastros por hora a partir da mesma rede.
+Link "Criar conta" na tela de entrada. Pede nome, e-mail, senha (mínimo de 8 caracteres) e a confirmação. A conta nasce como **caixa** (só vende) e **desligada**: a tela mostra o nome de usuário criado e avisa que o dono precisa liberar o acesso. A pessoa só entra depois que o dono liga a conta em Usuários; ali ele também marca outras permissões, se quiser. Assim, com o sistema na internet, um estranho não consegue se cadastrar e sair vendendo. Limite de 5 cadastros por hora a partir da mesma rede.
 
 ### Esqueci minha senha
 
@@ -192,7 +193,7 @@ A tela só remove. Para corrigir um estoque que está abaixo do real (ex.: depoi
 
 ### Histórico de movimentações
 
-Lista de tudo o que mexeu no estoque, mais recente primeiro, 20 por página, com filtro **Todas / Entradas / Vendas / Perdas / Ajustes**. O botão de planilha baixa em Excel até as 20.000 movimentações mais recentes do filtro escolhido; se houver mais, a última linha da planilha avisa quantas ficaram de fora.
+Lista de tudo o que mexeu no estoque, mais recente primeiro, 20 por página, com filtro **Todas / Entradas / Vendas / Perdas / Ajustes**. O botão de planilha baixa em Excel até as 20.000 movimentações mais recentes do filtro escolhido, com data e hora de Brasília em cada linha (no Excel a coluna é data, então ordena e filtra); se houver mais, a última linha da planilha avisa quantas ficaram de fora.
 
 | Tipo | Quando aparece |
 |---|---|
@@ -211,7 +212,7 @@ Para quem define preços (dono e financeiro). Cadastra ou atualiza muitos produt
    - *Produtos:* cadastrar novos e atualizar existentes, só cadastrar novos, ou só atualizar existentes.
    - *Identificar o produto por:* código de barras (e nome quando faltar o código) ou só pelo nome.
    - *Coluna de estoque:* usar só no cadastro de produtos novos, **substituir** o saldo atual (balanço) ou **somar** ao saldo atual (entrada de mercadoria).
-4. **Confira o que será gravado.** Cada linha aparece como criar, atualizar, ignorar ou erro, com o motivo, o preço antigo e o novo, o estoque antigo e o novo. **Avisos** não impedem a gravação. **Erros** impedem: a linha não é gravada.
+4. **Confira o que será gravado.** Cada linha aparece como criar, atualizar, ignorar ou erro, com o motivo, o preço antigo e o novo, o estoque antigo e o novo. Num produto que já existe, as observações dizem também o que mais a linha muda: nome, categoria, unidade, estoque mínimo e validade (ex.: Nome muda de "Arroz 5kg" para "Arroz Tipo 1"). Validade que já passou também gera aviso. **Avisos** não impedem a gravação. **Erros** impedem: a linha não é gravada.
 5. **Confirme.** O resultado mostra quantos produtos foram criados, atualizados e ignorados, e lista as linhas que não puderam ser gravadas.
 
 Proteções:
@@ -257,6 +258,7 @@ Lista de contas com nome, nome de usuário, e-mail, tipo (Dono, Financeiro, Esto
 - O dono troca a própria senha do mesmo jeito, no lápis da própria conta; depois disso o sistema pede para entrar de novo.
 - O dono não consegue desativar a própria conta, para não ficar trancado fora do sistema.
 - O e-mail de uma conta não se altera depois de criada, e contas não são apagadas, só desativadas.
+- Quem se cadastrou pelo "Criar conta" aparece aqui **desligado**. Para liberar, abra o lápis da pessoa e ligue a conta.
 
 ## Uso no celular e no notebook do caixa
 

@@ -5,7 +5,7 @@ info:
   description: |
     API de vendas e estoque do Mercadinho do João. Escrita a partir de `src/routes/*.js` no master de 25/11/2026 (commit 0df94d5).
 
-    - Sessão em cookie `mj_token` (JWT), definido por login, cadastro ou auto-login.
+    - Sessão em cookie `mj_token` (JWT), definido por login ou auto-login. O cadastro público não abre sessão.
     - Todo POST, PUT, PATCH e DELETE exige o cabeçalho `X-Requested-With: fetch` (defesa contra CSRF).
     - Autorização por permissão (`src/permissions.js`): sales.viewAll, sales.cancel, reports.view, prices.manage,
       products.manage, stock.manage. O dono (role ADMIN) tem todas e é o único com acesso a /users.
@@ -66,7 +66,12 @@ paths:
               schema: { $ref: '#/components/schemas/SessionUser' }
         '400': { $ref: '#/components/responses/Validation' }
         '401':
-          description: '"Login incorreto." (usuário inexistente ou inativo) ou "Senha incorreta."'
+          description: '"Login incorreto." (usuário inexistente, ou conta desativada com senha errada) ou "Senha incorreta."'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: 'Conta desativada ou ainda não liberada pelo dono, com a senha certa: "Sua conta ainda não foi liberada, ou foi desativada. Fale com o dono do mercadinho."'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -76,7 +81,7 @@ paths:
     post:
       tags: [auth]
       summary: Criar conta da equipe (auto-cadastro)
-      description: A conta nasce CASHIER, sem permissões extras e ativa, e a sessão já é aberta. Campos extras são recusados. Limite de 5 por hora por IP.
+      description: A conta nasce CASHIER, sem permissões extras e **desativada**, e nenhuma sessão é aberta. Só entra depois que o dono liga a conta (PUT /users/{id} com active true). Campos extras são recusados. Limite de 5 por hora por IP.
       security: []
       parameters:
         - $ref: '#/components/parameters/XRequestedWith'
@@ -94,10 +99,20 @@ paths:
                 password: { type: string, minLength: 8, maxLength: 200 }
       responses:
         '201':
-          description: Conta criada e sessão aberta.
+          description: Conta criada, desativada e sem sessão (nenhum Set-Cookie).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SessionUser' }
+              schema:
+                type: object
+                required: [id, name, email, username, role, active, message]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+                  email: { type: string, format: email }
+                  username: { type: string }
+                  role: { type: string, enum: [CASHIER] }
+                  active: { type: boolean, enum: [false] }
+                  message: { type: string, example: 'Conta criada. Ela fica parada até o dono do mercadinho liberar o seu acesso.' }
         '400': { $ref: '#/components/responses/Validation' }
         '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/TooMany' }

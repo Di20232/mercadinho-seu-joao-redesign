@@ -6,7 +6,7 @@ const { authenticate } = require('../auth');
 const { requirePermission } = require('../permissions');
 const { parseDateParam, parseEnumParam, clampIntParam } = require('../queryHelpers');
 const { applyStockDelta } = require('../stockOps');
-const { generateCsv, generateXlsx } = require('../exportService');
+const { generateCsv, generateXlsx, storeDateTime } = require('../exportService');
 
 const router = express.Router();
 // Movimentações de estoque (entradas de compra e ajustes/perdas) são
@@ -169,7 +169,9 @@ router.get('/movements/export', async (req, res) => {
 
   const headers = ['Data/Hora', 'Produto', 'Tipo', 'Quantidade', 'Estoque Anterior', 'Novo Estoque', 'Motivo', 'Usuário'];
   const rows = movements.map((m) => [
-    m.createdAt,
+    // Horário da loja: no fuso do servidor (UTC numa hospedagem) uma venda das
+    // 22h ia para o dia seguinte. No Excel continua sendo data, e não texto.
+    storeDateTime(m.createdAt),
     m.product.name,
     TYPE_LABELS[m.type] || m.type,
     Number(m.quantity),

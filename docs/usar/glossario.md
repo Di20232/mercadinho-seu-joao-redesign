@@ -48,7 +48,7 @@ Termos que aparecem nas telas, as regras que o sistema aplica e como cada númer
 | Desativar produto | Não apaga nada. O histórico de vendas e de estoque continua ligado ao produto. |
 | Cancelamento | Quem tem "Cancelar qualquer venda": qualquer venda, a qualquer hora. Os demais: só a própria venda, até 10 minutos depois de confirmada. Uma vez por venda. Devolve o estoque mesmo de produto já desativado. |
 | Ver vendas | Sem "Ver as vendas de todos", cada pessoa vê e abre só as próprias vendas. |
-| Contas novas | Sempre da equipe, venham do "Criar conta" (sem permissões) ou da tela Usuários (com as permissões que o dono marcar). Há um só dono. |
+| Contas novas | Sempre da equipe, venham do "Criar conta" (sem permissões e **desligada** até o dono liberar) ou da tela Usuários (com as permissões que o dono marcar). Há um só dono. |
 | Permissões | Só o dono marca. Valem na hora, mesmo com o sistema aberto. |
 | Desativar conta | Corta o acesso na hora, inclusive de quem está com o sistema aberto. O dono não desativa a si mesmo. |
 | Senha | Mínimo de 8 caracteres. Trocar a senha encerra as sessões abertas da conta. |

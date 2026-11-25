@@ -1,4 +1,16 @@
 const ExcelJS = require('exceljs');
+const { formatStoreDateTime, storeWallClock } = require('./storeTime');
+
+// Data e hora de um acontecimento (venda, movimentação) numa planilha, sempre
+// no horário da loja e não no do servidor. No CSV sai como texto
+// "25/11/2026 22:00"; no Excel, como data de verdade, que ordena e filtra.
+class StoreDateTime {
+  constructor(date) {
+    this.date = date;
+  }
+}
+const storeDateTime = (date) => new StoreDateTime(date);
+const XLSX_DATE_TIME_FORMAT = 'dd/mm/yyyy hh:mm';
 
 function sanitizeCsvCell(value) {
   if (value === null || value === undefined) return '';
@@ -12,6 +24,7 @@ function sanitizeCsvCell(value) {
 
 function formatCsvValue(value) {
   if (value === null || value === undefined) return '';
+  if (value instanceof StoreDateTime) return formatStoreDateTime(value.date);
   if (typeof value === 'number') {
     return String(value).replace('.', ',');
   }
@@ -67,7 +80,10 @@ function addSheet(workbook, sheetName, headers, rows) {
 
   // Add data rows
   for (const row of rows) {
-    sheet.addRow(row);
+    const added = sheet.addRow(row.map((v) => (v instanceof StoreDateTime ? storeWallClock(v.date) : v)));
+    row.forEach((v, i) => {
+      if (v instanceof StoreDateTime) added.getCell(i + 1).numFmt = XLSX_DATE_TIME_FORMAT;
+    });
   }
 
   // Freeze top row and enable auto filter
@@ -83,7 +99,8 @@ function addSheet(workbook, sheetName, headers, rows) {
   sheet.columns.forEach((column) => {
     let maxLength = 10;
     column.eachCell({ includeEmpty: true }, (cell) => {
-      const columnLength = cell.value ? String(cell.value).length : 10;
+      // Data vira "25/11/2026 22:00" na célula; String(Date) daria 60 letras.
+      const columnLength = cell.value instanceof Date ? 16 : cell.value ? String(cell.value).length : 10;
       if (columnLength > maxLength) {
         maxLength = columnLength;
       }
@@ -92,4 +109,4 @@ function addSheet(workbook, sheetName, headers, rows) {
   });
 }
 
-module.exports = { generateCsv, generateXlsx, generateWorkbook };
+module.exports = { generateCsv, generateXlsx, generateWorkbook, storeDateTime, XLSX_DATE_TIME_FORMAT };

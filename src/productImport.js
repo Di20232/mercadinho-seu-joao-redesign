@@ -4,6 +4,7 @@
 // do banco, e aponta linha a linha o que está errado — tudo antes de gravar
 // qualquer coisa.
 const { EXCEL_EPOCH_MS, MS_PER_DAY } = require('./spreadsheet');
+const { storeToday } = require('./storeTime');
 
 const FIELDS = [
   { key: 'name', label: 'Nome do produto', required: true },
@@ -228,7 +229,14 @@ function normalizeRow(cells, mapping, options) {
   if (rawExpiry !== undefined && cellText(rawExpiry) !== '') {
     const parsed = parseDate(rawExpiry);
     if (!parsed) errors.push(`Validade: "${cellText(rawExpiry)}" não é uma data válida (use 31/12/2026).`);
-    else values.expiryDate = parsed;
+    else {
+      values.expiryDate = parsed;
+      // Aviso, não erro: a planilha pode estar registrando um lote que já
+      // venceu e precisa sair da prateleira.
+      // "Hoje" da loja: no relógio do servidor (UTC), das 21h à meia-noite de
+      // Brasília já é amanhã, e o produto que vence hoje sairia como vencido.
+      if (parsed < storeToday()) warnings.push(`Validade ${parsed.split('-').reverse().join('/')} já passou.`);
+    }
   }
 
   if (values.costPrice !== undefined && values.salePrice !== undefined && values.costPrice > values.salePrice) {

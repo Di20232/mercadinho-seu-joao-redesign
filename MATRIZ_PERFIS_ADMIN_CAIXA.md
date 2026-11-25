@@ -18,7 +18,7 @@ Autorização precisa existir no backend. Esconder botão no frontend é apenas 
 | Recurso / ação | ADMIN | CASHIER / Caixa | Observação técnica |
 |---|---:|---:|---|
 | Login/logout | ✅ | ✅ | Ambos usam `/api/auth/login`, cookie HttpOnly e `/api/auth/me`. |
-| Auto-cadastro público | ✅* | ✅* | Conta nova nasce sempre como `CASHIER`; não aceita `role` do cliente. |
+| Auto-cadastro público | ✅* | ✅* | Conta nova nasce sempre como `CASHIER` e **desativada**, sem sessão, até o dono ligar em Usuários; não aceita `role` do cliente. |
 | Auto-login de demonstração | ❌ | ✅ | Só local/dev, via `AUTO_LOGIN_ENABLED=true`; backend bloqueia ADMIN. |
 | Registrar venda | ✅ | ✅ | `/api/sales` exige autenticação. Preço vem do banco. |
 | Ver lista de vendas | ✅ todas | ✅ próprias | Backend filtra por `sellerId` para Caixa. |

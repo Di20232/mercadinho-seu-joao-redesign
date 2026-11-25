@@ -2,6 +2,13 @@
 
 O que mudou para quem usa, em linguagem do dia a dia. A lista técnica completa está no [changelog](../evoluir/changelog.md).
 
+## 25/11/2026
+
+- **Cadastro com liberação do dono.** Quem cria conta pela tela "Criar conta" fica esperando: o dono libera em Usuários. Antes, a pessoa já entrava vendendo.
+- **Validade com a data certa.** A validade aparecia um dia antes (26/11 virava 25/11), e o produto que vence hoje ficava fora do e-mail diário.
+- **Importação avisa o que muda.** Na conferência, a linha que troca nome, categoria, unidade, mínimo ou validade de um produto que já existe aparece com aviso, assim como validade vencida.
+- **Planilha do histórico com hora.** A planilha do histórico do estoque traz data e hora de Brasília; no Excel a coluna continua sendo data, para ordenar e filtrar.
+
 ## 24/11/2026
 
 - **Busca sem acento.** "cafe", "CAFE" e "café" acham "Café", na venda e em Produtos.

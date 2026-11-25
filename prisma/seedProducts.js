@@ -6,11 +6,10 @@ const prisma = new PrismaClient();
 // Datas relativas a hoje, para o exemplo já nascer com alguns produtos
 // "vencendo em breve" e outros com validade tranquila — assim o painel de
 // alertas mostra dados reais assim que o sistema é aberto pela primeira vez.
+// Meia-noite UTC do dia, como o cadastro e a importação gravam a validade.
 function daysFromNow(days) {
   const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + days);
-  return d;
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate() + days));
 }
 
 // Catálogo de exemplo para um mercadinho de secos e molhados. Ajuste

@@ -137,7 +137,7 @@ docker-compose.yml      # Composição de containers
 
 ### Autenticação
 - `POST /api/auth/login` - Login
-- `POST /api/auth/register` - Registro
+- `POST /api/auth/register` - Cadastro público (a conta nasce desativada, sem sessão, até o dono ligar em Usuários)
 - `POST /api/auth/logout` - Logout
 - `POST /api/auth/forgot-password` - Solicitar reset de senha
 - `POST /api/auth/reset-password` - Redefinir senha

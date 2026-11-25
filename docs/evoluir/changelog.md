@@ -16,7 +16,7 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 
 ## [Não lançado]: candidata a 1.0.0
 
-`master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, e esta documentação.
+`master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação e o PR #11 (correções do teste do sistema inteiro).
 
 ### Adicionado
 - Documentação completa em `docs/`, organizada em usar, manter, sustentar e evoluir, com OpenAPI, ADRs e SBOM.
@@ -25,8 +25,10 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 - Busca de produto sem acento e sem maiúsculas (`1ad7a0e`, PR #5).
 - `npm run simulate:history`: 2 anos de histórico de demonstração que fecha no estoque atual (`e404cf8`, PR #3).
 - Planilha de exemplo com 300 produtos (`d479b1f`).
+- `src/storeTime.js`: horário da loja (Brasília) independente do relógio do servidor, usado na planilha do histórico do estoque e no aviso de validade da importação (`8c4e3ed`, `f33e8fc`, PR #11).
+- Conferência da importação mostra o que a linha muda num produto existente (nome, categoria, unidade, mínimo, validade) e avisa validade vencida (`e1bf58f`, PR #11).
 - README: e-mail de "esqueci minha senha", publicação na nuvem e a suíte de testes (`2e99c72`).
-- Testes de "já cadastrado", de vendas simultâneas, de quantidade, do relatório por e-mail e de unidade (exportador, histórico, conexão morta): a suíte foi de 54 para 72.
+- Testes de "já cadastrado", de vendas simultâneas, de quantidade, do relatório por e-mail e de unidade (exportador, histórico, conexão morta): a suíte foi de 54 para 72. Com o PR #11, de 72 para 81.
 
 ### Alterado
 - `npm test` roda também `test/security.test.js` (`2c582f4`) e os três arquivos de teste de unidade.
@@ -36,9 +38,14 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 - Exportação do histórico do estoque: até 20.000 linhas com aviso de corte e tipo em português; CSV com campos entre aspas quando preciso (`5090d02`, `50d7eef`).
 - A regra de "já cadastrado" ficou num lugar só, `src/uniqueError.js`, sem mudar mensagens (`c0d7f22`).
 - Telas ajustadas para celular (375 px) e para o caixa em notebook (`6216c5a`).
+- **⚠ Quebra (API):** `POST /api/auth/register` cria a conta **desativada** e não abre sessão; responde `{ id, name, email, username, role, active: false, message }`. Login de conta desativada com a senha certa dá 403 com mensagem própria; com a senha errada, o 401 "Login incorreto." de sempre ([ADR-0020](../manter/adr/0020-cadastro-publico-nasce-desativado.md); `08843e7`, PR #11). Contas já criadas pelo cadastro continuam ativas.
+- O limite geral da API sobe só dentro da suíte de testes (`7fc3270`, PR #11).
 
 ### Corrigido
 - Rótulos do gráfico do Painel encavalados no último dia (`18c6cc6`).
+- Validade exibida um dia antes (gravada em meia-noite UTC e lida no fuso local), com o selo de vencido e os "dias para vencer" errados por um; o alerta diário deixava de fora o produto que vence hoje (`fedb477`, PR #11).
+- Planilha do histórico do estoque com a data no fuso do servidor e sem a hora; no XLSX, a Data/Hora agora é data de verdade, e não texto (`04bca1a`, `8c4e3ed`, PR #11).
+- Aviso de validade vencida da importação usava o dia do servidor: em UTC, das 21h à meia-noite, o produto que vence hoje saía como vencido (`f33e8fc`, PR #11).
 - Erro 500 por impasse com dois caixas vendendo os mesmos produtos; histórico com saldos repetidos em vendas simultâneas (`50d7eef`).
 - Quantidade com mais de 3 casas virava venda de R$ 0,00; produto por unidade aceitava fração (`50d7eef`). **⚠ Quebra (API):** essas vendas agora dão 400.
 - Primeiro acesso depois de o banco ficar parado dava 500 ou demorava ([ADR-0019](../manter/adr/0019-repetir-leitura-com-conexao-morta.md); `d491b32`, PR #2).

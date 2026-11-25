@@ -133,7 +133,8 @@ flowchart LR
 | Histórico simulado | `src/historyGenerator.js`, `prisma/simulateHistory.js` | Gera vendas, compras e perdas de demonstração que terminam no estoque atual; não roda em produção |
 | Previsão | `src/forecast.js` | Previsão de esgotamento, divisão de alertas, produtos parados |
 | Importação | `src/spreadsheet.js`, `src/productImport.js`, `src/routes/imports.js` | Lê planilha, adivinha colunas, normaliza valores brasileiros, monta o plano, grava |
-| Exportação | `src/exportService.js` | CSV (campos com `;` ou aspas entre aspas) e XLSX, com uma ou várias abas |
+| Exportação | `src/exportService.js` | CSV (campos com `;` ou aspas entre aspas) e XLSX, com uma ou várias abas. `storeDateTime(date)` marca data e hora de um acontecimento: texto no CSV, data no XLSX, sempre no horário da loja |
+| Horário da loja | `src/storeTime.js` | `storeToday`, `formatStoreDateTime` e `storeWallClock` no fuso `America/Sao_Paulo`, independentes do relógio do servidor (UTC na nuvem) |
 | "Já cadastrado" | `src/uniqueError.js` | 409 na checagem prévia e na violação de chave única (P2002) |
 | Alerta diário | `src/jobs/dailyAlerts.js` | Transporte SMTP, texto do alerta, agendamento, teste da conexão na subida |
 

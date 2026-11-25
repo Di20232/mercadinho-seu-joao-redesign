@@ -45,7 +45,7 @@
 
       <form id="register-form" class="auth-form view-enter">
         <h1>Criar conta</h1>
-        <p class="muted">Você já entra no sistema logo depois do cadastro.</p>
+        <p class="muted">Depois do cadastro, o dono do mercadinho libera o seu acesso.</p>
 
         <label for="name">Nome</label>
         <div class="field">
@@ -83,6 +83,15 @@
           <a href="/index.html" class="link-action">Já tenho conta: entrar</a>
         </div>
       </form>
+
+      <div class="auth-form auth-done view-enter" id="register-done" hidden>
+        <svg class="success-check" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="26" /><path d="M17 29l7 7 15-16" /></svg>
+        <h1>Conta criada</h1>
+        <p id="register-done-text"></p>
+        <div class="login-links">
+          <a href="/index.html" class="link-action">Ir para o login</a>
+        </div>
+      </div>
     </main>
   </div>
 

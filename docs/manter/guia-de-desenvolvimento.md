@@ -118,7 +118,7 @@ A variável do terminal vale mais que a do `.env` (o `dotenv` não sobrescreve o
 # duration_ms 14122
 ```
 
-O `npm test` roda cinco arquivos: `integration.test.js` (precisa do banco), `security.test.js`, e os testes de unidade `retryStaleRead.test.js`, `historyGenerator.test.js` e `exportService.test.js`.
+O `npm test` roda seis arquivos: `integration.test.js` (precisa do banco), `security.test.js`, e os testes de unidade `retryStaleRead.test.js`, `historyGenerator.test.js`, `exportService.test.js` e `storeTime.test.js`.
 
 Depois de puxar commits com migration nova, aplique-as também no banco de teste (o `prisma migrate deploy` acima), senão os testes falham por coluna inexistente.
 
@@ -147,6 +147,7 @@ Duas pessoas (ou dois agentes) rodando a suíte **no mesmo banco** ao mesmo temp
 │   ├── spreadsheet.js      leitura de planilha
 │   ├── productImport.js    colunas e valores da importação
 │   ├── exportService.js    CSV e XLSX
+│   ├── storeTime.js        horário da loja (Brasília), independente do servidor
 │   ├── uniqueError.js      409 "já cadastrado"
 │   ├── username.js         nome de usuário
 │   ├── validate.js         middleware Zod

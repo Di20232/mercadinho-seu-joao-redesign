@@ -106,6 +106,9 @@ function generateResetToken() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
+const PENDING_ACCOUNT_MESSAGE = 'Conta criada. Ela fica parada até o dono do mercadinho liberar o seu acesso.';
+const INACTIVE_ACCOUNT_MESSAGE = 'Sua conta ainda não foi liberada, ou foi desativada. Fale com o dono do mercadinho.';
+
 router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
   const { password } = req.body;
   // Nome de usuário nunca tem "@", então ele decide se o login é e-mail ou usuário.
@@ -116,10 +119,17 @@ router.post('/login', loginLimiter, validate(loginSchema), async (req, res) => {
   // Mensagens distintas para e-mail e senha, por escolha de usabilidade: o
   // usuário sabe qual dos dois corrigir. Contrapartida: revela se um e-mail
   // está cadastrado — a força bruta continua contida pelo loginLimiter.
-  if (!user || !user.active) {
+  if (!user) {
     return res.status(401).json({ error: 'Login incorreto.' });
   }
   const ok = await verifyPassword(password, user.passwordHash);
+  // Conta inativa (aguardando o dono liberar, ou desligada por ele) só ganha
+  // mensagem própria com a senha certa; sem ela, responde como sempre, para
+  // não confirmar a estranhos que a conta existe e está parada.
+  if (!user.active) {
+    if (!ok) return res.status(401).json({ error: 'Login incorreto.' });
+    return res.status(403).json({ error: INACTIVE_ACCOUNT_MESSAGE });
+  }
   if (!ok) return res.status(401).json({ error: 'Senha incorreta.' });
 
   const token = signToken(user);
@@ -157,9 +167,10 @@ router.post('/auto-login', autoLoginLimiter, async (req, res) => {
   res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
 });
 
-// Auto-cadastro público. Conta nasce como CASHIER e ativa, e a sessão é aberta
-// na mesma resposta, então quem se cadastra entra direto no sistema. Nunca
-// aceita role do cliente — o schema é .strict() e o papel é fixado no servidor.
+// Auto-cadastro público. A conta nasce como CASHIER e **inativa**, sem abrir
+// sessão: com o sistema na internet, qualquer pessoa poderia se cadastrar e
+// registrar vendas. Ela só entra depois que o dono liga a conta em Usuários.
+// Nunca aceita role do cliente — o schema é .strict() e o papel é fixado no servidor.
 router.post('/register', registerLimiter, validate(registerSchema), async (req, res) => {
   const { name, email, password } = req.body;
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
@@ -176,15 +187,21 @@ router.post('/register', registerLimiter, validate(registerSchema), async (req, 
           username,
           passwordHash,
           role: 'CASHIER',
-          active: true,
+          active: false,
         },
       }),
     DUPLICATE.userEmail,
   );
 
-  const token = signToken(user);
-  setAuthCookie(res, token);
-  res.status(201).json({ id: user.id, name: user.name, email: user.email, username: user.username, role: user.role });
+  res.status(201).json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    username: user.username,
+    role: user.role,
+    active: false,
+    message: PENDING_ACCOUNT_MESSAGE,
+  });
 });
 
 // Solicitação de reset. A resposta é SEMPRE genérica, independente do ambiente
