@@ -163,7 +163,7 @@ Isso é contorno até existir uma tela de histórico de vendas ([roadmap](../evo
 
 1. Procure no log do app:
    ```bash
-   docker compose logs app | grep -E "alertas|forgot-password|relatorio-email"
+   docker compose logs app | grep -E "alertas|forgot-password"
    ```
 2. Leia a linha:
 
@@ -175,7 +175,6 @@ Isso é contorno até existir uma tela de histórico de vendas ([roadmap](../evo
 | `[alertas] ALERT_EMAIL_TO contém um endereço inválido` | Endereço digitado errado | Corrija `ALERT_EMAIL_TO` |
 | `[alertas] Nenhum alerta hoje.` | Nada para avisar | Normal |
 | `[forgot-password] falha ao enviar e-mail de reset` | Envio falhou | Mesmo caminho da conexão |
-| `[relatorio-email] falha no envio: ...` | O relatório por e-mail não saiu (a tela mostra "Não foi possível enviar o e-mail...") | Mesmo caminho da conexão |
 
 3. No Docker local, lembre que o link sai com `http://localhost:3000` (dívida DT-14). Troque a porta por 3100 ao abrir.
 

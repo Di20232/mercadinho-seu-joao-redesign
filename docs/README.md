@@ -4,7 +4,7 @@ Sistema web de vendas e estoque para um mercadinho de bairro (secos e molhados).
 
 Esta pasta organiza a documentação pelas quatro perguntas que alguém faz a um sistema: **como uso**, **como funciona**, **como mantenho no ar** e **como atualizo sem quebrar**. Cada documento responde a uma pergunta e tem um público certo.
 
-> Retrato do `master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026 (commit `0df94d5`, com os PRs #2 a #9 mesclados): permissões por pessoa, produto aguardando preço, venda idempotente e sem impasse, busca sem acento, relatório por e-mail e app instalável no celular. Suíte de testes: 72 de 72 passando nessa data. Atualizada depois com o PR #11 (cadastro com liberação do dono, validade e planilhas no horário da loja): 81 de 81.
+> Retrato do `master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026 (commit `0df94d5`, com os PRs #2 a #9 mesclados): permissões por pessoa, produto aguardando preço, venda idempotente e sem impasse, busca sem acento, relatório por e-mail e app instalável no celular. Suíte de testes: 72 de 72 passando nessa data. Atualizada depois com o PR #11 (cadastro com liberação do dono, validade e planilhas no horário da loja): 81 de 81. Com a retirada do relatório por e-mail, em 25/11: 79 de 79.
 
 ## Mapa
 

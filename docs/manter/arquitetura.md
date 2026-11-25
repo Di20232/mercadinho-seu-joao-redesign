@@ -27,7 +27,7 @@ flowchart LR
     equipe -- "vende e consulta; o resto<br/>conforme as permissões" --> sistema
     planilha -- "importação de produtos" --> sistema
     sistema -- "planilhas exportadas" --> dono
-    sistema -- "link de nova senha<br/>alerta diário de estoque<br/>relatório por e-mail" --> smtp
+    sistema -- "link de nova senha<br/>alerta diário de estoque" --> smtp
     smtp -- "e-mail" --> dono
 ```
 

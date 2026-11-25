@@ -34,8 +34,7 @@ Todo erro responde `{ "error": "mensagem em português" }`. Erros de validação
 | 422 | `Idempotency-Key` já usada em outra venda (outro carrinho ou outro usuário) |
 | 429 | Limite de requisições estourado |
 | 500 | Falha inesperada: sempre "Erro interno do servidor.", detalhe só no log |
-| 502 | Relatório por e-mail: o servidor SMTP recusou ou não respondeu |
-| 503 | Auto-login ligado sem credenciais configuradas; relatório por e-mail sem SMTP configurado |
+| 503 | Auto-login ligado sem credenciais configuradas |
 
 ### Limites de requisição
 
@@ -49,7 +48,6 @@ Contados por IP, em memória (reiniciar o processo zera).
 | `POST /api/auth/forgot-password` | 5 a cada 15 min |
 | `POST /api/auth/reset-password` | 10 a cada 15 min |
 | `POST /api/auth/auto-login` | 10 a cada 15 min |
-| `POST /api/reports/email` | 10 a cada 15 min |
 
 Com `NODE_ENV=test`, só o limite geral continua valendo.
 
@@ -112,7 +110,6 @@ Coluna "Acesso": **público** (sem sessão), **logado** (qualquer pessoa), o nom
 | `GET /top-products` | `from`, `to`, `limit` (1 a 50, padrão 10). Ordenado por faturamento |
 | `GET /slow-moving` | `days` (1 a 365, padrão 60) |
 | `GET /forecast/export`, `/sales-summary/export`, `/top-products/export`, `/slow-moving/export` | Mesmos parâmetros, mais `format=csv` (padrão) ou `xlsx` |
-| `POST /email` | `{ email, from?, to? }`. Manda o relatório do período por e-mail: resumo no corpo e XLSX com as abas Resumo, Vendas por dia, Mais vendidos (50), Produtos parados (60 dias) e Previsão de estoque. 200 `{ ok, sentTo }`; 503 sem SMTP; 502 se o envio falhar; 10 envios a cada 15 min por IP |
 
 ### Usuários: `/api/users` (dono)
 

@@ -1234,46 +1234,6 @@ test('venda: item que sairia por R$ 0,00 é recusado', async () => {
   assert.equal(res.status, 400);
 });
 
-// ---------- Relatório por e-mail ----------
-
-test('relatório por e-mail: sem SMTP avisa, e-mail inválido dá 400 e quem não vê relatórios recebe 403', async () => {
-  const semRelatorio = await loginWithPermissions('estoque.email@example.com', ['stock.manage']);
-  assert.equal((await request(baseUrl, semRelatorio, '/api/reports/email', { method: 'POST', body: { email: 'a@b.com' } })).status, 403);
-
-  const invalido = await request(baseUrl, adminJar, '/api/reports/email', { method: 'POST', body: { email: 'nao-e-email' } });
-  assert.equal(invalido.status, 400);
-
-  const semSmtp = await request(baseUrl, adminJar, '/api/reports/email', { method: 'POST', body: { email: 'dono@example.com' } });
-  assert.equal(semSmtp.status, 503);
-  assert.match(semSmtp.body.error, /SMTP_HOST/);
-});
-
-test('relatório por e-mail: manda resumo no corpo e um Excel com uma aba por relatório', async () => {
-  const mailer = require('../src/jobs/dailyAlerts');
-  const original = mailer.buildTransport;
-  let sent = null;
-  mailer.buildTransport = () => ({ sendMail: async (mail) => { sent = mail; } });
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const res = await request(baseUrl, adminJar, '/api/reports/email', {
-      method: 'POST', body: { email: 'financeiro@example.com', from: '2020-01-01', to: today },
-    });
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.equal(sent.to, 'financeiro@example.com');
-    assert.match(sent.subject, /Relatório de vendas — 01\/01\/2020 a /);
-    assert.match(sent.text, /Total vendido: R\$/);
-    assert.match(sent.text, /Mais vendidos:/);
-
-    const ExcelJS = require('exceljs');
-    const book = new ExcelJS.Workbook();
-    await book.xlsx.load(sent.attachments[0].content);
-    assert.deepEqual(book.worksheets.map((w) => w.name), ['Resumo', 'Vendas por dia', 'Mais vendidos', 'Produtos parados', 'Previsão de estoque']);
-    assert.equal(book.getWorksheet('Resumo').getCell('A2').value, 'Período');
-  } finally {
-    mailer.buildTransport = original;
-  }
-});
-
 test('exportação: histórico do estoque sai com o tipo em português', async () => {
   const product = await request(baseUrl, adminJar, '/api/products', {
     method: 'POST', body: { name: 'Produto Exporta Tipo', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 5 },

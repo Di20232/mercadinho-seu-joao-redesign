@@ -26,7 +26,7 @@ Base de várias regras abaixo (`src/permissions.js`). O dono (`role = ADMIN`) te
 |---|---|---|
 | `sales.viewAll` | Listar e abrir vendas de todos | Financeiro |
 | `sales.cancel` | Cancelar qualquer venda, a qualquer momento | Financeiro |
-| `reports.view` | `/api/reports/*` (inclusive o envio por e-mail), exportações de relatórios, totais financeiros e produtos parados no painel | Financeiro |
+| `reports.view` | `/api/reports/*`, exportações de relatórios, totais financeiros e produtos parados no painel | Financeiro |
 | `prices.manage` | Informar preço, ver custo e margem, `/api/imports/*`, aviso de produtos aguardando preço, escrever produtos | Financeiro |
 | `products.manage` | Criar, editar, desativar e reativar produtos, sem preço | Estoque |
 | `stock.manage` | `/api/stock/*` (entradas, perdas, ajustes, histórico, exportação) | Estoque |
@@ -89,7 +89,7 @@ Base de várias regras abaixo (`src/permissions.js`). O dono (`role = ADMIN`) te
 | RN-23 | Vencendo = validade até hoje + `EXPIRY_ALERT_DAYS` (7). O painel inclui vencidos; o e-mail diário não. | `src/routes/dashboard.js`, `src/jobs/dailyAlerts.js` | **sem teste** |
 | RN-24 | Relatórios contam só vendas não canceladas e exigem `reports.view`. O filtro "até" inclui o dia inteiro (até 23:59:59.999 UTC). | `src/routes/reports.js` | I: "relatórios: filtro até uma data inclui vendas do dia inteiro"; I: "perfis: cada permissão..." |
 | RN-25 | Exportação em CSV (`;`, UTF-8 com BOM, decimal com vírgula, campo com `;`, aspas ou quebra de linha entre aspas) e XLSX. Relatórios: `reports.view`; movimentações: `stock.manage`, até 20.000 linhas mais recentes, com uma linha final de aviso quando corta, o tipo em português e a Data/Hora no horário de Brasília (texto no CSV, data no XLSX; `src/storeTime.js`). Células que começam com `=`, `+`, `-`, `@` são neutralizadas contra injeção de fórmula. | `src/exportService.js`, `src/routes/reports.js`, `src/routes/stock.js` (`EXPORT_LIMIT`) | I: "exportação: administrador consegue exportar..."; I: "exportação: caixa é bloqueado (403)..."; I: "exportação: histórico do estoque sai com o tipo em português"; U: "CSV: ";", aspas e quebra de linha..."; U: "CSV: fórmulas continuam neutralizadas..."; I: "exportação: movimentações saem com data e hora de Brasília..."; U: "CSV: data e hora saem em texto..."; U: "Excel: data e hora continuam sendo data..."; U: "horário da loja: ..." (3) |
-| RN-38 | Relatório por e-mail: quem tem `reports.view` manda para qualquer endereço o relatório do período (resumo no corpo e Excel com cinco abas). Sem SMTP: 503 com orientação; falha no envio: 502; limite de 10 envios por 15 min por IP. | `src/routes/reports.js` (`POST /email`), `src/jobs/dailyAlerts.js` (`buildTransport`) | I: "relatório por e-mail: sem SMTP avisa, e-mail inválido dá 400 e quem não vê relatórios recebe 403"; I: "relatório por e-mail: manda resumo no corpo e um Excel..." |
+| RN-38 | **Removida em 25/11/2026** (era o relatório por e-mail). Os relatórios saem só pela tela e pelas planilhas. | — | — |
 | RN-25a | Totais financeiros do painel (vendas do dia e do mês, produtos parados) só para `reports.view`; os alertas de estoque e validade, para todos. | `src/routes/dashboard.js` | **sem teste** |
 
 ## Importação

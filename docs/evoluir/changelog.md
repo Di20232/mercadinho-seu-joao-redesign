@@ -18,6 +18,9 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 
 `master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação, o PR #11 (correções do teste do sistema inteiro) e o PR #12 (Vendas no celular).
 
+### Removido
+- **⚠ Quebra:** relatório por e-mail (botão "Enviar por e-mail" e `POST /api/reports/email`, que tinham entrado no PR #3). O envio não funcionava no Render grátis, que bloqueia as portas SMTP comuns. As planilhas continuam para baixar; nada a fazer na atualização.
+
 ### Adicionado
 - `render.yaml` (Blueprint do Render): serviço web Node 22, `TZ=America/Sao_Paulo`, `JWT_SECRET` gerado e o dono criado no build, sem shell. Sem `APP_BASE_URL`, o sistema usa o `RENDER_EXTERNAL_URL`.
 - Documentação completa em `docs/`, organizada em usar, manter, sustentar e evoluir, com OpenAPI, ADRs e SBOM.
@@ -29,7 +32,7 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 - `src/storeTime.js`: horário da loja (Brasília) independente do relógio do servidor, usado na planilha do histórico do estoque e no aviso de validade da importação (`8c4e3ed`, `f33e8fc`, PR #11).
 - Conferência da importação mostra o que a linha muda num produto existente (nome, categoria, unidade, mínimo, validade) e avisa validade vencida (`e1bf58f`, PR #11).
 - README: e-mail de "esqueci minha senha", publicação na nuvem e a suíte de testes (`2e99c72`).
-- Testes de "já cadastrado", de vendas simultâneas, de quantidade, do relatório por e-mail e de unidade (exportador, histórico, conexão morta): a suíte foi de 54 para 72. Com o PR #11, de 72 para 81.
+- Testes de "já cadastrado", de vendas simultâneas, de quantidade, do relatório por e-mail e de unidade (exportador, histórico, conexão morta): a suíte foi de 54 para 72. Com o PR #11, de 72 para 81; sem o relatório por e-mail, 79.
 
 ### Alterado
 - `npm test` roda também `test/security.test.js` (`2c582f4`) e os três arquivos de teste de unidade.

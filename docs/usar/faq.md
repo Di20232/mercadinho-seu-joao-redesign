@@ -191,18 +191,6 @@ A linha é de um produto que ainda não existe e está sem preço de venda.
 
 ## Relatórios e painel
 
-### "O envio por e-mail ainda não está configurado..."
-
-O servidor não tem SMTP configurado. Quem cuida do sistema precisa preencher `SMTP_*` ([deploy](../sustentar/deploy-e-infraestrutura.md#variáveis-de-ambiente)). Enquanto isso, use os botões de planilha.
-
-### "Não foi possível enviar o e-mail. Confira o usuário e a senha de app do Gmail no .env."
-
-O SMTP está configurado, mas o envio falhou. Avise quem cuida do sistema ([runbook](../sustentar/runbooks.md#e-mail-não-chega)).
-
-### "Muitos envios seguidos. Aguarde alguns minutos e tente de novo."
-
-São até 10 relatórios por e-mail a cada 15 minutos. Espere.
-
 ### A planilha do histórico do estoque termina com "ATENÇÃO: mostrando as 20.000 movimentações mais recentes..."
 
 O histórico tem mais linhas do que o limite de uma planilha. Filtre por tipo (Entradas, Vendas, Perdas, Ajustes) para baixar o resto em partes.

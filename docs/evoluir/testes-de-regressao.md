@@ -1,6 +1,6 @@
 # Testes de regressão
 
-A suíte que prova que uma atualização não quebrou nada: 81 testes automatizados mais um roteiro manual curto para o que os testes não alcançam (as telas).
+A suíte que prova que uma atualização não quebrou nada: 79 testes automatizados mais um roteiro manual curto para o que os testes não alcançam (as telas).
 
 ## Como rodar
 
@@ -20,12 +20,13 @@ A suíte apaga o banco de teste antes de rodar e recusa bancos sem `test` no nom
 | 24/11/2026 | `84e5186` | 22.23.2 | 54/54 | 9,7 s |
 | 25/11/2026 | `master` (`0df94d5`) + docs | 22.23.2 | **72/72** | 14,1 s |
 | 25/11/2026 | PR #11 + docs (`f33e8fc`) | 24.19.0 | **81/81**, também com `TZ=UTC` | 11,8 s |
+| 25/11/2026 | sem o relatório por e-mail | 24.19.0 | **79/79**, também com `TZ=UTC` | 12,8 s |
 
 Registre aqui cada execução antes de um deploy.
 
 ## O que cada teste protege
 
-`I` = `test/integration.test.js` (59 testes, HTTP real contra PostgreSQL real). `S` = `test/security.test.js` (8 testes, sem banco). `U` = testes de unidade sem banco: `retryStaleRead.test.js` (3), `historyGenerator.test.js` (4), `exportService.test.js` (4), `storeTime.test.js` (3). A coluna "Regra" aponta para [requisitos e regras](../manter/requisitos-e-regras.md).
+`I` = `test/integration.test.js` (57 testes, HTTP real contra PostgreSQL real). `S` = `test/security.test.js` (8 testes, sem banco). `U` = testes de unidade sem banco: `retryStaleRead.test.js` (3), `historyGenerator.test.js` (4), `exportService.test.js` (4), `storeTime.test.js` (3). A coluna "Regra" aponta para [requisitos e regras](../manter/requisitos-e-regras.md).
 
 | # | Teste | Arquivo | Regra |
 |---|---|---|---|
@@ -81,35 +82,33 @@ Registre aqui cada execução antes de um deploy.
 | 50 | venda: quantidade com mais de 3 casas decimais é recusada (não vira venda de R$ 0,00) | I | RN-37 |
 | 51 | venda: produto vendido por unidade não aceita fração; por quilo aceita | I | RN-37 |
 | 52 | venda: item que sairia por R$ 0,00 é recusado | I | RN-37 |
-| 53 | relatório por e-mail: sem SMTP avisa, e-mail inválido dá 400 e quem não vê relatórios recebe 403 | I | RN-38 |
-| 54 | relatório por e-mail: manda resumo no corpo e um Excel com uma aba por relatório | I | RN-38 |
-| 55 | exportação: histórico do estoque sai com o tipo em português | I | RN-25 |
-| 56 | JWT: signToken inclui issuer e audience | S | RN-30 |
-| 57 | JWT: verificação falha com issuer inválido | S | RN-30 |
-| 58 | JWT: verificação falha com audience inválida | S | RN-30 |
-| 59 | JWT: algoritmo inválido é rejeitado | S | RN-30 |
-| 60 | CORS: app.js importa cors corretamente | S | RN-27 |
-| 61 | CORS: configuração permite origens do allowlist | S | RN-27 |
-| 62 | Sales: app.js calcula preço do servidor, não do cliente | S | RN-02 |
-| 63 | produção: config recusa APP_BASE_URL ausente ou localhost e aceita endereço público | S | RN-29 |
-| 64 | conexão morta: leitura é repetida e acaba funcionando | U | RN-39 |
-| 65 | conexão morta: escrita nunca é repetida (evita gravar duas vezes) | U | RN-39 |
-| 66 | outros erros não são repetidos, e a leitura desiste depois de 5 tentativas | U | RN-39 |
-| 67 | histórico: cada produto fecha no estoque de hoje, sem saldo negativo e com a conta certa | U | RN-41 |
-| 68 | histórico: produto vendido por unidade nunca tem quantidade ou saldo fracionado | U | RN-41 |
-| 69 | histórico: tem vendas, compras e perdas, e nada depois do fim de cada produto | U | RN-41 |
-| 70 | histórico: venda cancelada tem a baixa e a devolução, e não mexe no saldo | U | RN-41 |
-| 71 | CSV: ";", aspas e quebra de linha no texto não deslocam as colunas | U | RN-25 |
-| 72 | CSV: fórmulas continuam neutralizadas e números ficam com vírgula | U | RN-25 |
-| 73 | validade: alerta diário inclui o produto que vence hoje, com a data certa | I | RN-33 |
-| 74 | importação: conferência avisa troca de nome, mínimo, categoria e validade vencida | I | RN-26 |
-| 75 | exportação: movimentações saem com data e hora de Brasília e o tipo em português (CSV em texto, XLSX como data) | I | RN-25 |
-| 76 | cadastro público: conta nasce desativada, sem sessão, e só entra depois que o dono libera | I | RN-15, RN-18 |
-| 77 | CSV: data e hora saem em texto, no horário da loja | U | RN-25 |
-| 78 | Excel: data e hora continuam sendo data (ordena e filtra), no horário da loja | U | RN-25 |
-| 79 | horário da loja: "hoje" é o dia de Brasília, não o do servidor | U | RN-26 |
-| 80 | horário da loja: data e hora em texto, no formato brasileiro | U | RN-25 |
-| 81 | horário da loja: relógio de Brasília guardado nos campos UTC (para o Excel) | U | RN-25 |
+| 53 | exportação: histórico do estoque sai com o tipo em português | I | RN-25 |
+| 54 | JWT: signToken inclui issuer e audience | S | RN-30 |
+| 55 | JWT: verificação falha com issuer inválido | S | RN-30 |
+| 56 | JWT: verificação falha com audience inválida | S | RN-30 |
+| 57 | JWT: algoritmo inválido é rejeitado | S | RN-30 |
+| 58 | CORS: app.js importa cors corretamente | S | RN-27 |
+| 59 | CORS: configuração permite origens do allowlist | S | RN-27 |
+| 60 | Sales: app.js calcula preço do servidor, não do cliente | S | RN-02 |
+| 61 | produção: config recusa APP_BASE_URL ausente ou localhost e aceita endereço público | S | RN-29 |
+| 62 | conexão morta: leitura é repetida e acaba funcionando | U | RN-39 |
+| 63 | conexão morta: escrita nunca é repetida (evita gravar duas vezes) | U | RN-39 |
+| 64 | outros erros não são repetidos, e a leitura desiste depois de 5 tentativas | U | RN-39 |
+| 65 | histórico: cada produto fecha no estoque de hoje, sem saldo negativo e com a conta certa | U | RN-41 |
+| 66 | histórico: produto vendido por unidade nunca tem quantidade ou saldo fracionado | U | RN-41 |
+| 67 | histórico: tem vendas, compras e perdas, e nada depois do fim de cada produto | U | RN-41 |
+| 68 | histórico: venda cancelada tem a baixa e a devolução, e não mexe no saldo | U | RN-41 |
+| 69 | CSV: ";", aspas e quebra de linha no texto não deslocam as colunas | U | RN-25 |
+| 70 | CSV: fórmulas continuam neutralizadas e números ficam com vírgula | U | RN-25 |
+| 71 | validade: alerta diário inclui o produto que vence hoje, com a data certa | I | RN-33 |
+| 72 | importação: conferência avisa troca de nome, mínimo, categoria e validade vencida | I | RN-26 |
+| 73 | exportação: movimentações saem com data e hora de Brasília e o tipo em português (CSV em texto, XLSX como data) | I | RN-25 |
+| 74 | cadastro público: conta nasce desativada, sem sessão, e só entra depois que o dono libera | I | RN-15, RN-18 |
+| 75 | CSV: data e hora saem em texto, no horário da loja | U | RN-25 |
+| 76 | Excel: data e hora continuam sendo data (ordena e filtra), no horário da loja | U | RN-25 |
+| 77 | horário da loja: "hoje" é o dia de Brasília, não o do servidor | U | RN-26 |
+| 78 | horário da loja: data e hora em texto, no formato brasileiro | U | RN-25 |
+| 79 | horário da loja: relógio de Brasília guardado nos campos UTC (para o Excel) | U | RN-25 |
 
 Os testes 60 a 62 (`security.test.js`) leem o código-fonte ou repetem a lógica, em vez de exercitar o servidor; quebram com uma simples renomeação. O comportamento equivalente está coberto pelos testes 3 e 8.
 
@@ -151,8 +150,7 @@ Num ambiente local com dados de exemplo (`seed`, `seed:products`, `simulate:sale
 | 10 | dono | Usuários: mudar o tipo de alguém para Personalizado, desligar e religar | Selo muda; a pessoa perde e recupera o acesso |
 | 11 | dono | Tema escuro, recolher menu, tela em 375 px | Nada cortado ou sobreposto |
 | 12 | caixa | Buscar "cafe"; pôr um produto por UN e digitar 1,5 | Acha "Café"; o subtotal é de 2 unidades |
-| 13 | financeiro | Relatórios → Enviar por e-mail (com SMTP de teste) | "Relatório enviado para ..."; Excel com 5 abas |
-| 14 | qualquer | No celular (Chrome Android, HTTPS), tocar "Instalar app"; desligar a internet | App com ícone próprio; página "sem conexão" |
-| 15 | qualquer | Console do navegador | Sem erro, sem violação de CSP |
+| 13 | qualquer | No celular (Chrome Android, HTTPS), tocar "Instalar app"; desligar a internet | App com ícone próprio; página "sem conexão" |
+| 14 | qualquer | Console do navegador | Sem erro, sem violação de CSP |
 
 Registre o resultado na tabela de execuções, com o que falhou.

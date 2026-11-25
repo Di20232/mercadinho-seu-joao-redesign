@@ -36,7 +36,7 @@ npx prisma migrate status
 2. Os scripts soltos da raiz foram removidos. Use: `npm run seed` (no lugar de `create-admin.js`), `npm run reset-password -- email` (no lugar de `reset-password.js`), `npm run simulate:sales` (no lugar de `simulate-data.js`).
 3. Se vier de antes de 06/11/2026, aplique as duas migrations novas e marque as permissões da equipe em Usuários.
 4. Produtos vendidos por peso precisam ter a unidade certa (KG, G, L, LT, ML, M, MT): com UN, a venda agora recusa fração. Confira em Produtos antes de liberar o caixa.
-5. Relatório por e-mail e app instalável não pedem configuração além do SMTP e do HTTPS.
+5. O app instalável não pede configuração além do HTTPS.
 
 ## Do Docker local para a nuvem
 

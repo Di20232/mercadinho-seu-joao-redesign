@@ -17,7 +17,6 @@ Termos que aparecem nas telas, as regras que o sistema aplica e como cada númer
 | **Produto ativo / inativo** | Inativo é o produto "removido". Não aparece em vendas novas nem para o caixa, mas continua no banco com todo o histórico, e o dono pode reativar. |
 | **Unidade** | Como o produto é contado: UN, KG, PCT, CX, L... Texto livre de até 10 letras. Decide se a venda aceita fração: só KG, G, L, LT, ML, M e MT aceitam (`src/units.js`); as outras pedem quantidade inteira. Não muda nenhum outro cálculo. |
 | **Estoque atual** | Quantidade registrada no sistema. Aceita até 3 casas decimais (venda a peso). Nunca fica negativa e nunca passa de 50.000.000. |
-| **Relatório por e-mail** | O mesmo conteúdo da tela Relatórios, mandado para um endereço com um Excel de cinco abas. |
 | **App instalado** | O sistema aberto como aplicativo no celular (PWA), com ícone próprio. É o mesmo sistema do navegador e precisa de internet. |
 | **Estoque mínimo** | Quantidade a partir da qual o produto é considerado "Estoque baixo". Definido pelo dono em cada produto. |
 | **Movimentação** | Registro de qualquer mudança de estoque: tipo, quantidade, saldo anterior, saldo novo, motivo, quem fez e quando. Não se edita nem se apaga. |

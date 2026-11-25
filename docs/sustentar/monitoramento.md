@@ -34,7 +34,6 @@ O sistema escreve só na saída padrão (`console.log` e `console.error`). Não 
 | `[alertas] E-mail de alerta enviado.` / `Nenhum alerta hoje.` | Alerta diário rodou | informação | |
 | `[forgot-password] link de reset para ...` | Pedido de nova senha (só fora de produção; o log contém um link válido) | informação | Não compartilhe esse log |
 | `[forgot-password] falha ao enviar e-mail de reset` | Usuário pediu senha e o e-mail falhou | média | Runbook do e-mail |
-| `[relatorio-email] falha no envio: ...` | Relatório por e-mail não saiu | baixa | Runbook do e-mail |
 | `✗ Banco de dados não ficou pronto em tempo hábil` | O contêiner do banco não respondeu em 60 s | **alta** | [Runbook do contêiner](runbooks.md#contêiner-app-não-sobe) |
 
 O rate limit (429) não aparece no log.

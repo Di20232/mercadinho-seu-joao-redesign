@@ -61,7 +61,6 @@ O CSS usa `:has()` e `color-mix()`, e o JavaScript usa `fetch`, `crypto.getRando
 | Excel `.xlsx` / `.xlsm`, CSV, TSV, texto colado | **testado** pelos testes de importação | |
 | Excel `.xls`, LibreOffice `.ods` | **incompatível** | salvar como `.xlsx` ou `.csv` |
 | CSV exportado aberto no Excel em português | declarado | `;` como separador, vírgula decimal, UTF-8 com BOM |
-| Relatório por e-mail com anexo XLSX | declarado (a suíte testa com um transporte falso) | mesmo SMTP do alerta diário |
 | Leitor de código de barras | **incompatível** hoje | a busca da venda não procura código ([DT-02](roadmap-e-divida-tecnica.md)) |
 
 ## Como manter esta matriz

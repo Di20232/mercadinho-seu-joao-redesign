@@ -1,16 +1,10 @@
 const express = require('express');
-const rateLimit = require('express-rate-limit');
-const { z } = require('zod');
 const prisma = require('../db');
-const validate = require('../validate');
-const httpError = require('../httpError');
-const mailer = require('../jobs/dailyAlerts'); // mailer.buildTransport() lido na hora: o teste troca por um falso
-const config = require('../config');
 const { authenticate } = require('../auth');
 const { requirePermission } = require('../permissions');
 const { getStockForecast, getSlowMovingProducts } = require('../forecast');
 const { parseDateParam, clampIntParam } = require('../queryHelpers');
-const { generateCsv, generateXlsx, generateWorkbook } = require('../exportService');
+const { generateCsv, generateXlsx } = require('../exportService');
 
 const router = express.Router();
 router.use(authenticate, requirePermission('reports.view'));
@@ -142,91 +136,6 @@ router.get('/slow-moving/export', async (req, res) => {
   const rows = slowRows(await getSlowMovingProducts(days));
 
   await sendExport(res, req.query.format, `produtos-parados_${days}dias`, 'Produtos Parados', headers, rows);
-});
-
-// ---------- Relatório por e-mail ----------
-// Resumo no corpo + um Excel com uma aba por relatório do período escolhido.
-// Usa o mesmo transporte SMTP dos alertas (ex.: Gmail com senha de app).
-
-// Evita que uma conta comprometida use o sistema para disparar e-mails em massa.
-const emailLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Muitos envios seguidos. Aguarde alguns minutos e tente de novo.' },
-  skip: () => process.env.NODE_ENV === 'test',
-});
-
-const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (use AAAA-MM-DD).');
-const emailSchema = z.object({
-  email: z.string().trim().email('E-mail inválido.').max(255),
-  from: dateOnly.optional(),
-  to: dateOnly.optional(),
-});
-
-const brl = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const brDate = (iso) => iso.split('-').reverse().join('/');
-
-router.post('/email', emailLimiter, validate(emailSchema), async (req, res) => {
-  const transport = mailer.buildTransport();
-  if (!transport) {
-    throw httpError(503, 'O envio por e-mail ainda não está configurado. Preencha SMTP_HOST, SMTP_USER e SMTP_PASS no .env (veja o .env.example).');
-  }
-
-  const { email, from, to } = req.body;
-  const where = saleWhere({ from, to });
-  const [{ total, count, byDay }, top, slow, forecast] = await Promise.all([
-    salesByDay(where), topProducts(where, 50), getSlowMovingProducts(60), getStockForecast(),
-  ]);
-  const period = from || to ? `${from ? brDate(from) : 'o início'} a ${to ? brDate(to) : 'hoje'}` : 'todo o período';
-  const capital = slow.reduce((sum, p) => sum + p.capitalParado, 0);
-
-  const summary = [
-    ['Período', period],
-    ['Total vendido (R$)', Number(total.toFixed(2))],
-    ['Vendas', count],
-    ['Ticket médio (R$)', count ? Number((total / count).toFixed(2)) : 0],
-    ['Produtos parados há 60 dias', slow.length],
-    ['Capital parado (R$)', Number(capital.toFixed(2))],
-    ['Produtos abaixo do estoque mínimo', forecast.filter((p) => p.lowStock).length],
-  ];
-  const attachment = await generateWorkbook([
-    { name: 'Resumo', headers: ['Indicador', 'Valor'], rows: summary },
-    { name: 'Vendas por dia', headers: BY_DAY_HEADERS, rows: byDayRows(byDay) },
-    { name: 'Mais vendidos', headers: TOP_HEADERS, rows: topRows(top) },
-    { name: 'Produtos parados', headers: SLOW_HEADERS, rows: slowRows(slow) },
-    { name: 'Previsão de estoque', headers: FORECAST_HEADERS, rows: forecastRows(forecast) },
-  ]);
-
-  const text = [
-    `Relatório do Mercadinho do João — ${period}`,
-    '',
-    `Total vendido: ${brl(total)}`,
-    `Vendas: ${count.toLocaleString('pt-BR')}`,
-    `Ticket médio: ${brl(count ? total / count : 0)}`,
-    '',
-    'Mais vendidos:',
-    ...top.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} — ${brl(p.revenue)}`),
-    '',
-    `Produtos parados há 60 dias: ${slow.length} (${brl(capital)} em estoque)`,
-    '',
-    'A planilha completa está em anexo.',
-  ].join('\n');
-
-  try {
-    await transport.sendMail({
-      from: config.smtp.from,
-      to: email,
-      subject: `Relatório de vendas — ${period}`,
-      text,
-      attachments: [{ filename: `relatorio_${from || 'inicio'}_a_${to || 'hoje'}.xlsx`, content: Buffer.from(attachment) }],
-    });
-  } catch (err) {
-    console.error('[relatorio-email] falha no envio:', err.message);
-    throw httpError(502, 'Não foi possível enviar o e-mail. Confira o usuário e a senha de app do Gmail no .env.');
-  }
-  res.json({ ok: true, sentTo: email });
 });
 
 module.exports = router;
