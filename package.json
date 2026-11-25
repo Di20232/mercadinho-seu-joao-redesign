@@ -15,7 +15,7 @@
     "seed:perfis": "node prisma/seedPerfis.js",
     "simulate:sales": "node prisma/simulateSales.js",
     "reset-password": "node prisma/resetPassword.js",
-    "test": "node --test test/integration.test.js",
+    "test": "node --test test/integration.test.js test/retryStaleRead.test.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
