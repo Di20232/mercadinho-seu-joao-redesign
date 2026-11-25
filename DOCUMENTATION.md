@@ -75,7 +75,7 @@ Primeira tela ao entrar no sistema — resume, num único lugar: estoque abaixo 
 
 ### 2.9 Gestão de usuários (administrador)
 
-O sistema tem um único administrador (o dono); toda outra conta é funcionário (caixa), seja criada pelo administrador ou pelo auto-cadastro na tela de login — o perfil não é escolhido nem editável. O administrador cadastra novos usuários (nome, e-mail, senha), edita nome/status ativo e redefine a senha de outro usuário. Ele não pode se autodesativar (trava contra ficar acidentalmente trancado fora do próprio sistema).
+O sistema tem um único administrador (o dono); toda outra conta é funcionário (caixa), seja criada pelo administrador ou pelo auto-cadastro na tela de login — o perfil não é escolhido nem editável. A conta do auto-cadastro nasce **desativada** e não abre sessão: só entra depois que o administrador a liga em Usuários. No login, ela recebe uma mensagem própria ("ainda não foi liberada") só quando a senha confere. O administrador cadastra novos usuários (nome, e-mail, senha), edita nome/status ativo e redefine a senha de outro usuário. Ele não pode se autodesativar (trava contra ficar acidentalmente trancado fora do próprio sistema).
 
 Toda conta recebe um **nome de usuário** gerado automaticamente — primeiro nome, minúsculo e sem acento, mais um código aleatório de 4 dígitos (ex: `diego1239`) — que serve para entrar no lugar do e-mail. Ele aparece no topo do sistema, ao lado do nome, e na lista de Usuários do administrador.
 

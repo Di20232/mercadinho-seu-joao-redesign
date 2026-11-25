@@ -93,6 +93,10 @@ test('login: aceita o nome de usuário gerado no cadastro', async () => {
   // Primeiro nome, minúsculo e sem acento, seguido de 4 dígitos.
   assert.match(register.body.username, /^joaquim\d{4}$/);
 
+  // A conta do cadastro público nasce desativada; o dono liga em Usuários.
+  const activate = await request(baseUrl, adminJar, `/api/users/${register.body.id}`, { method: 'PUT', body: { active: true } });
+  assert.equal(activate.status, 200);
+
   // O login pelo e-mail continua coberto pelos demais testes (todos entram por e-mail).
   const byUsername = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
     method: 'POST',
@@ -1345,4 +1349,45 @@ test('exportação: movimentações saem com data e hora de Brasília e o tipo e
 
   const expected = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
   assert.ok(line.startsWith(expected), `data esperada em Brasília: ${expected}, veio: ${line.slice(0, 16)}`);
+});
+
+// Com o sistema na internet, o cadastro público não pode dar acesso sozinho:
+// a conta nasce desativada e sem sessão, até o dono ligar em Usuários.
+test('cadastro público: conta nasce desativada, sem sessão, e só entra depois que o dono libera', async () => {
+  const jar = makeCookieJar();
+  const register = await request(baseUrl, jar, '/api/auth/register', {
+    method: 'POST',
+    body: { name: 'Pessoa Zpendente', email: 'pessoa.pendente@example.com', password: 'SenhaPendente123!' },
+  });
+  assert.equal(register.status, 201);
+  assert.equal(register.body.active, false);
+  assert.match(register.body.message, /dono do mercadinho liberar/);
+  assert.doesNotMatch(jar.header(), /mj_token=/, 'o cadastro não pode abrir sessão');
+  assert.equal((await request(baseUrl, jar, '/api/products')).status, 401);
+
+  // Senha certa: mensagem própria. Senha errada: a mesma resposta de sempre.
+  const pending = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
+    method: 'POST',
+    body: { login: 'pessoa.pendente@example.com', password: 'SenhaPendente123!' },
+  });
+  assert.equal(pending.status, 403);
+  assert.match(pending.body.error, /ainda não foi liberada/);
+  const wrong = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
+    method: 'POST',
+    body: { login: 'pessoa.pendente@example.com', password: 'SenhaErrada123!' },
+  });
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.body.error, 'Login incorreto.', 'sem a senha certa, não pode revelar que a conta existe e está parada');
+
+  const users = await request(baseUrl, adminJar, '/api/users');
+  const listed = users.body.find((u) => u.email === 'pessoa.pendente@example.com');
+  assert.equal(listed.active, false, 'o dono vê a conta desativada em Usuários');
+  const activate = await request(baseUrl, adminJar, `/api/users/${listed.id}`, { method: 'PUT', body: { active: true } });
+  assert.equal(activate.status, 200);
+
+  const allowed = await request(baseUrl, makeCookieJar(), '/api/auth/login', {
+    method: 'POST',
+    body: { login: 'pessoa.pendente@example.com', password: 'SenhaPendente123!' },
+  });
+  assert.equal(allowed.status, 200);
 });

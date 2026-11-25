@@ -38,10 +38,12 @@ form.addEventListener('submit', async (e) => {
 
   setButtonLoading(submitBtn, true);
   try {
-    // O cadastro já abre a sessão (cookie definido na resposta), então vai
-    // direto para o sistema, como depois de um login.
-    await api.post('/auth/register', { name, email, password });
-    location.href = '/app.html';
+    // A conta nasce parada: só entra depois que o dono a liga em Usuários.
+    const created = await api.post('/auth/register', { name, email, password });
+    document.getElementById('register-done-text').textContent =
+      `${created.message} Seu usuário para entrar é ${created.username} (ou o e-mail ${created.email}).`;
+    form.hidden = true;
+    document.getElementById('register-done').hidden = false;
   } catch (err) {
     setButtonLoading(submitBtn, false);
     showError(err.message);
