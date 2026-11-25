@@ -1345,7 +1345,9 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Com a barra lateral aberta, o carrinho ficava com ~330px em 1024px e
      escondia subtotal e "remover". Empilha carrinho e resumo. */
-  .pos-grid { grid-template-columns: 1fr; }
+  /* minmax(0,1fr): um 1fr puro não encolhe abaixo da largura da tabela do
+     carrinho e empurrava a página além da tela no celular. */
+  .pos-grid { grid-template-columns: minmax(0, 1fr); }
   .pos-summary { position: static; }
 }
 
@@ -1355,7 +1357,7 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   .steps .step { width: 76px; }
   .auth-shell { grid-template-columns: 1fr; }
   .auth-brand { display: none; }
-  .dash-grid, .dash-grid.three, .grid-2, .pos-grid { grid-template-columns: 1fr; }
+  .dash-grid, .dash-grid.three, .grid-2, .pos-grid { grid-template-columns: minmax(0, 1fr); }
   .pos-summary { position: static; }
 }
 
@@ -1430,6 +1432,32 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   /* Telas de conta: links de texto e o olho da senha ficavam com 17–28px. */
   .link-action { display: inline-flex; align-items: center; min-height: 48px; }
   .field-action { min-width: 48px; min-height: 48px; justify-content: center; align-items: center; }
+  /* Carrinho e vendas recentes viram cartões: nenhuma coluna escondida à direita. */
+  .cart-table thead, .sales-table thead { display: none; }
+  .cart-table, .cart-table tbody, .sales-table, .sales-table tbody { display: block; width: 100%; }
+  .cart-table tr, .sales-table tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+    gap: 6px 12px; padding: 12px 2px; border-bottom: 1px solid var(--border);
+  }
+  .cart-table tr:last-child, .sales-table tr:last-child { border-bottom: none; }
+  .cart-table td, .sales-table td { display: block; padding: 0; border: none; }
+  .cart-table tr { grid-template-areas: "nome remover" "preco preco" "qtd subtotal"; }
+  .cart-table td.cart-name { grid-area: nome; }
+  .cart-table td:nth-child(2) { grid-area: qtd; }
+  .cart-table td:nth-child(3) { grid-area: preco; font-size: 0.8125rem; color: var(--text-muted); }
+  .cart-table td:nth-child(3)::after { content: " cada"; }
+  .cart-table td:nth-child(4) { grid-area: subtotal; text-align: right; font-weight: 700; }
+  .sales-table tr { grid-template-areas: "data total" "quem acoes" "itens acoes"; }
+  .sales-table td:nth-child(1) { grid-area: data; font-weight: 600; }
+  .sales-table td:nth-child(2) { grid-area: quem; font-size: 0.8125rem; color: var(--text-muted); }
+  .sales-table td:nth-child(3) { grid-area: itens; font-size: 0.8125rem; color: var(--text-muted); }
+  .sales-table td:nth-child(3)::before { content: "Itens: "; }
+  .sales-table td:nth-child(4) { grid-area: total; text-align: right; }
+  .sales-table td.muted { grid-column: 1 / -1; }
+  .cart-table td.td-actions, .sales-table td.td-actions { grid-area: remover; position: static; box-shadow: none; background: none; }
+  .sales-table td.td-actions { grid-area: acoes; }
+  /* Comprovante: colunas mais justas para caber em 360px. */
+  .receipt-table th, .receipt-table td { padding: 8px 6px; font-size: 0.8125rem; }
 }
 
 /* ---------- Impressão do comprovante ---------- */

@@ -16,7 +16,7 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 
 ## [Não lançado]: candidata a 1.0.0
 
-`master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação e o PR #11 (correções do teste do sistema inteiro).
+`master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação, o PR #11 (correções do teste do sistema inteiro) e o PR #12 (Vendas no celular).
 
 ### Adicionado
 - Documentação completa em `docs/`, organizada em usar, manter, sustentar e evoluir, com OpenAPI, ADRs e SBOM.
@@ -43,6 +43,7 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 
 ### Corrigido
 - Rótulos do gráfico do Painel encavalados no último dia (`18c6cc6`).
+- Tela de Vendas cortada no celular com produtos no carrinho: a grade de uma coluna (`1fr`) não encolhia abaixo da largura da tabela. Agora `minmax(0, 1fr)`, e até 600 px o carrinho e as vendas recentes viram cartões (`5db36b8`, PR #12).
 - Validade exibida um dia antes (gravada em meia-noite UTC e lida no fuso local), com o selo de vencido e os "dias para vencer" errados por um; o alerta diário deixava de fora o produto que vence hoje (`fedb477`, PR #11).
 - Planilha do histórico do estoque com a data no fuso do servidor e sem a hora; no XLSX, a Data/Hora agora é data de verdade, e não texto (`04bca1a`, `8c4e3ed`, PR #11).
 - Aviso de validade vencida da importação usava o dia do servidor: em UTC, das 21h à meia-noite, o produto que vence hoje saía como vencido (`f33e8fc`, PR #11).

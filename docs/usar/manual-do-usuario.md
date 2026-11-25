@@ -262,4 +262,4 @@ Lista de contas com nome, nome de usuário, e-mail, tipo (Dono, Financeiro, Esto
 
 ## Uso no celular e no notebook do caixa
 
-As telas se ajustam a celular (a partir de 375 px de largura), notebook e monitor. No celular, o menu fica no botão ☰ e as tabelas rolam para o lado.
+As telas se ajustam a celular (a partir de 375 px de largura), notebook e monitor. No celular, o menu fica no botão ☰ e as tabelas rolam para o lado. Na tela de Vendas, o carrinho e as vendas recentes viram cartões, sem rolar: cada item mostra nome, preço, quantidade, subtotal e a lixeira.
