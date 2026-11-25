@@ -236,6 +236,8 @@ Para quem vê faturamento (dono e financeiro). Escolha o período: **Hoje**, **7
 
 Os botões de planilha baixam o resumo por dia e os mais vendidos em Excel. Vendas canceladas não entram em nenhum relatório.
 
+**Baixar planilha** (ao lado de Aplicar) baixa um Excel único do período mostrado na tela, com uma aba por relatório: resumo, vendas por dia, mais vendidos (50), produtos parados há 60 dias e previsão de estoque.
+
 ## Instalar no celular
 
 O sistema pode virar um app no celular, com ícone próprio e tela cheia. Quando ele é aberto no celular pelo navegador, aparece o aviso **Instale o Mercadinho no celular**:

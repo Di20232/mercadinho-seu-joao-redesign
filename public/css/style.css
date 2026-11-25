@@ -1234,6 +1234,7 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
 .filter-bar .date-range { display: flex; gap: 10px; align-items: flex-end; }
 .filter-bar .date-range label { margin: 0 0 5px; font-size: 0.75rem; }
 .filter-bar .date-range input { width: 160px; padding: 8px 12px; }
+.filter-bar .date-range .btn { min-height: 39px; }
 .card-actions { display: inline-flex; gap: 6px; margin-left: auto; }
 .card-head > .chip + .card-actions { margin-left: 0; }
 
@@ -1394,7 +1395,7 @@ form.card[data-tone="danger"] button[type="submit"]:hover { background: var(--da
   .filter-bar .date-range { flex-wrap: wrap; }
   .filter-bar .date-range > div { flex: 1 1 130px; min-width: 0; }
   .filter-bar .date-range input { width: 100%; }
-  .filter-bar .date-range button { flex: 1 1 100%; }
+  .filter-bar .date-range button, .filter-bar .date-range .btn { flex: 1 1 100%; justify-content: center; min-height: 48px; }
 
   /* Em 360px o botão "Planilha" dos relatórios passava 2px da tela: o
      cabeçalho do cartão agora quebra a linha em vez de vazar. */

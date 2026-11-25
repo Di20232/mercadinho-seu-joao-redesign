@@ -110,6 +110,7 @@ Coluna "Acesso": **público** (sem sessão), **logado** (qualquer pessoa), o nom
 | `GET /top-products` | `from`, `to`, `limit` (1 a 50, padrão 10). Ordenado por faturamento |
 | `GET /slow-moving` | `days` (1 a 365, padrão 60) |
 | `GET /forecast/export`, `/sales-summary/export`, `/top-products/export`, `/slow-moving/export` | Mesmos parâmetros, mais `format=csv` (padrão) ou `xlsx` |
+| `GET /export` | `from`, `to`. Um XLSX com as abas Resumo, Vendas por dia, Mais vendidos (50), Produtos parados (60 dias) e Previsão de estoque |
 
 ### Usuários: `/api/users` (dono)
 

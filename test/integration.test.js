@@ -1234,6 +1234,23 @@ test('venda: item que sairia por R$ 0,00 é recusado', async () => {
   assert.equal(res.status, 400);
 });
 
+test('exportação: planilha completa dos relatórios tem uma aba por relatório e respeita o período', async () => {
+  const semRelatorio = await loginWithPermissions('estoque.planilha@example.com', ['stock.manage']);
+  assert.equal((await request(baseUrl, semRelatorio, '/api/reports/export')).status, 403);
+  assert.equal((await request(baseUrl, adminJar, '/api/reports/export?from=lixo')).status, 400);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const res = await fetch(`${baseUrl}/api/reports/export?from=2020-01-01&to=${today}`, { headers: { Cookie: adminJar.header() } });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-disposition'), /relatorio_2020-01-01_a_.+\.xlsx/);
+
+  const ExcelJS = require('exceljs');
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(Buffer.from(await res.arrayBuffer()));
+  assert.deepEqual(book.worksheets.map((w) => w.name), ['Resumo', 'Vendas por dia', 'Mais vendidos', 'Produtos parados', 'Previsão de estoque']);
+  assert.match(book.getWorksheet('Resumo').getCell('B2').value, /^01\/01\/2020 a /);
+});
+
 test('exportação: histórico do estoque sai com o tipo em português', async () => {
   const product = await request(baseUrl, adminJar, '/api/products', {
     method: 'POST', body: { name: 'Produto Exporta Tipo', unit: 'UN', costPrice: 1, salePrice: 2, initialStock: 5 },
