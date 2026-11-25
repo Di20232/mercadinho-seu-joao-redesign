@@ -84,4 +84,11 @@ if (config.nodeEnv === 'production' && config.jwtSecret.startsWith('dev-only')) 
   throw new Error('JWT_SECRET inseguro em produção. Defina um segredo forte no .env.');
 }
 
+// Sem APP_BASE_URL o link do e-mail de "esqueci minha senha" sairia como
+// http://localhost:PORT — o e-mail chega, mas o link não abre para ninguém.
+// Melhor recusar subir do que falhar em silêncio na mão do cliente.
+if (config.nodeEnv === 'production' && !/^https?:\/\/(?!localhost\b|127\.0\.0\.1\b)/.test(process.env.APP_BASE_URL || '')) {
+  throw new Error('APP_BASE_URL ausente ou apontando para localhost em produção. Defina o endereço público do sistema (ex.: https://mercadinho.onrender.com).');
+}
+
 module.exports = config;

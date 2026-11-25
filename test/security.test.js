@@ -134,3 +134,27 @@ test('Sales: app.js calcula preço do servidor, não do cliente', async () => {
   assert(!salesCode.includes('item.price') || !salesCode.includes('req.body'),
     'Não deve confiar em preço enviado pelo cliente');
 });
+
+// Em produção, o servidor precisa saber o próprio endereço público para montar
+// o link do e-mail de "esqueci minha senha"; sem isso ele recusa iniciar.
+test('produção: config recusa APP_BASE_URL ausente ou localhost e aceita endereço público', () => {
+  const { spawnSync } = require('node:child_process');
+  const path = require('node:path');
+  const configPath = path.join(__dirname, '..', 'src', 'config.js');
+  const run = (appBaseUrl) => {
+    const env = { ...process.env, NODE_ENV: 'production', JWT_SECRET: 'segredo-de-teste-forte-0123456789abcdef' };
+    delete env.APP_BASE_URL;
+    if (appBaseUrl !== undefined) env.APP_BASE_URL = appBaseUrl;
+    return spawnSync(process.execPath, ['-e', `require(${JSON.stringify(configPath)})`], { env, encoding: 'utf8' });
+  };
+
+  const missing = run(undefined);
+  assert.notStrictEqual(missing.status, 0, 'sem APP_BASE_URL deveria recusar iniciar');
+  assert.match(missing.stderr, /APP_BASE_URL/);
+
+  const local = run('http://localhost:3000');
+  assert.notStrictEqual(local.status, 0, 'localhost em produção deveria recusar iniciar');
+
+  const ok = run('https://mercadinho.exemplo.com.br');
+  assert.strictEqual(ok.status, 0, ok.stderr);
+});

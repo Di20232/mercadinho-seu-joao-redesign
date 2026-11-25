@@ -3,8 +3,10 @@ const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
 const httpError = require('../httpError');
+const { DUPLICATE, ensureAvailable, guardUnique } = require('../uniqueError');
 const { authenticate } = require('../auth');
 const { clampIntParam } = require('../queryHelpers');
+const { findProductIdsByName } = require('../productSearch');
 const { can, requirePermission } = require('../permissions');
 
 const router = express.Router();
@@ -83,7 +85,8 @@ router.get('/', async (req, res) => {
   const { query, category, lowStock, includeInactive, pricePending } = req.query;
   const where = {};
   if (!(includeInactive === 'true' && canEditCatalog(req.user))) where.active = true;
-  if (query) where.name = { contains: String(query), mode: 'insensitive' };
+  // Busca sem acento: "cafe" acha "Café" (ver src/productSearch.js).
+  if (query) where.id = { in: await findProductIdsByName(query) };
   if (category) where.category = String(category);
   if (pricePending === 'true') Object.assign(where, PRICE_PENDING_WHERE);
 
@@ -131,47 +134,45 @@ router.post('/', requirePermission('products.manage', 'prices.manage'), validate
 
   if (data.barcode) {
     const dup = await prisma.product.findUnique({ where: { barcode: data.barcode } });
-    if (dup) throw httpError(409, 'Já existe um produto com este código de barras.');
+    ensureAvailable(dup, DUPLICATE.productBarcode);
   }
 
-  let product;
-  try {
-    product = await prisma.$transaction(async (tx) => {
-      const created = await tx.product.create({
-        data: {
-          name: data.name,
-          barcode: data.barcode || null,
-          category: data.category || null,
-          unit: data.unit,
-          costPrice: decimalOrNull(data.costPrice ?? null, 2),
-          salePrice: decimalOrNull(data.salePrice ?? null, 2),
-          minStock: data.minStock.toFixed(3),
-          currentStock: data.initialStock.toFixed(3),
-          expiryDate: data.expiryDate ? new Date(`${data.expiryDate}T00:00:00Z`) : null,
-        },
-      });
-
-      if (data.initialStock > 0) {
-        await tx.stockMovement.create({
+  // guardUnique cobre duas requisições simultâneas com o mesmo código de barras.
+  const product = await guardUnique(
+    () =>
+      prisma.$transaction(async (tx) => {
+        const created = await tx.product.create({
           data: {
-            productId: created.id,
-            type: 'ENTRY',
-            quantity: data.initialStock.toFixed(3),
-            previousStock: '0',
-            newStock: data.initialStock.toFixed(3),
-            reason: 'Estoque inicial no cadastro',
-            userId: req.user.sub,
+            name: data.name,
+            barcode: data.barcode || null,
+            category: data.category || null,
+            unit: data.unit,
+            costPrice: decimalOrNull(data.costPrice ?? null, 2),
+            salePrice: decimalOrNull(data.salePrice ?? null, 2),
+            minStock: data.minStock.toFixed(3),
+            currentStock: data.initialStock.toFixed(3),
+            expiryDate: data.expiryDate ? new Date(`${data.expiryDate}T00:00:00Z`) : null,
           },
         });
-      }
 
-      return created;
-    });
-  } catch (err) {
-    // P2002 = violação de restrição única (ex: duas requisições simultâneas com o mesmo código de barras)
-    if (err.code === 'P2002') throw httpError(409, 'Já existe um produto com este código de barras.');
-    throw err;
-  }
+        if (data.initialStock > 0) {
+          await tx.stockMovement.create({
+            data: {
+              productId: created.id,
+              type: 'ENTRY',
+              quantity: data.initialStock.toFixed(3),
+              previousStock: '0',
+              newStock: data.initialStock.toFixed(3),
+              reason: 'Estoque inicial no cadastro',
+              userId: req.user.sub,
+            },
+          });
+        }
+
+        return created;
+      }),
+    DUPLICATE.productBarcode,
+  );
 
   res.status(201).json(serializeProduct(product, req.user));
 });
@@ -184,31 +185,29 @@ router.put('/:id', requirePermission('products.manage', 'prices.manage'), valida
 
   if (data.barcode && data.barcode !== existing.barcode) {
     const dup = await prisma.product.findUnique({ where: { barcode: data.barcode } });
-    if (dup) throw httpError(409, 'Já existe um produto com este código de barras.');
+    ensureAvailable(dup, DUPLICATE.productBarcode);
   }
 
-  let product;
-  try {
-    product = await prisma.product.update({
-      where: { id: req.params.id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.barcode !== undefined && { barcode: data.barcode || null }),
-        ...(data.category !== undefined && { category: data.category || null }),
-        ...(data.unit !== undefined && { unit: data.unit }),
-        ...(data.costPrice !== undefined && { costPrice: decimalOrNull(data.costPrice, 2) }),
-        ...(data.salePrice !== undefined && { salePrice: decimalOrNull(data.salePrice, 2) }),
-        ...(data.minStock !== undefined && { minStock: data.minStock.toFixed(3) }),
-        ...(data.expiryDate !== undefined && {
-          expiryDate: data.expiryDate ? new Date(`${data.expiryDate}T00:00:00Z`) : null,
-        }),
-        ...(data.active !== undefined && { active: data.active }),
-      },
-    });
-  } catch (err) {
-    if (err.code === 'P2002') throw httpError(409, 'Já existe um produto com este código de barras.');
-    throw err;
-  }
+  const product = await guardUnique(
+    () =>
+      prisma.product.update({
+        where: { id: req.params.id },
+        data: {
+          ...(data.name !== undefined && { name: data.name }),
+          ...(data.barcode !== undefined && { barcode: data.barcode || null }),
+          ...(data.category !== undefined && { category: data.category || null }),
+          ...(data.unit !== undefined && { unit: data.unit }),
+          ...(data.costPrice !== undefined && { costPrice: decimalOrNull(data.costPrice, 2) }),
+          ...(data.salePrice !== undefined && { salePrice: decimalOrNull(data.salePrice, 2) }),
+          ...(data.minStock !== undefined && { minStock: data.minStock.toFixed(3) }),
+          ...(data.expiryDate !== undefined && {
+            expiryDate: data.expiryDate ? new Date(`${data.expiryDate}T00:00:00Z`) : null,
+          }),
+          ...(data.active !== undefined && { active: data.active }),
+        },
+      }),
+    DUPLICATE.productBarcode,
+  );
 
   res.json(serializeProduct(product, req.user));
 });

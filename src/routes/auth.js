@@ -5,7 +5,7 @@ const { z } = require('zod');
 const prisma = require('../db');
 const config = require('../config');
 const validate = require('../validate');
-const httpError = require('../httpError');
+const { DUPLICATE, ensureAvailable, guardUnique } = require('../uniqueError');
 const { hashPassword, verifyPassword, signToken, setAuthCookie, clearAuthCookie, authenticate } = require('../auth');
 const { generateUsername } = require('../username');
 const { effectivePermissions } = require('../permissions');
@@ -163,25 +163,24 @@ router.post('/auto-login', autoLoginLimiter, async (req, res) => {
 router.post('/register', registerLimiter, validate(registerSchema), async (req, res) => {
   const { name, email, password } = req.body;
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) throw httpError(409, 'Já existe um usuário com este e-mail. Faça login ou solicite recuperação de senha.');
+  ensureAvailable(existing, `${DUPLICATE.userEmail} Faça login ou solicite recuperação de senha.`);
 
   const passwordHash = await hashPassword(password);
-  let user;
-  try {
-    user = await prisma.user.create({
-      data: {
-        name,
-        email: email.toLowerCase(),
-        username: await generateUsername(prisma, name),
-        passwordHash,
-        role: 'CASHIER',
-        active: true,
-      },
-    });
-  } catch (err) {
-    if (err.code === 'P2002') throw httpError(409, 'Já existe um usuário com este e-mail.');
-    throw err;
-  }
+  const username = await generateUsername(prisma, name);
+  const user = await guardUnique(
+    () =>
+      prisma.user.create({
+        data: {
+          name,
+          email: email.toLowerCase(),
+          username,
+          passwordHash,
+          role: 'CASHIER',
+          active: true,
+        },
+      }),
+    DUPLICATE.userEmail,
+  );
 
   const token = signToken(user);
   setAuthCookie(res, token);

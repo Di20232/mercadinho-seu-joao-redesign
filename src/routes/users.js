@@ -3,6 +3,7 @@ const { z } = require('zod');
 const prisma = require('../db');
 const validate = require('../validate');
 const httpError = require('../httpError');
+const { DUPLICATE, ensureAvailable, guardUnique } = require('../uniqueError');
 const { authenticate, authorize, hashPassword } = require('../auth');
 const { generateUsername } = require('../username');
 const { PERMISSIONS, ALL, TEMPLATES } = require('../permissions');
@@ -43,18 +44,15 @@ router.get('/', async (req, res) => {
 router.post('/', validate(createSchema), async (req, res) => {
   const { name, email, password, permissions } = req.body;
   const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (existing) throw httpError(409, 'Já existe um usuário com este e-mail.');
+  ensureAvailable(existing, DUPLICATE.userEmail);
 
   const passwordHash = await hashPassword(password);
-  let user;
-  try {
-    // Contas criadas pelo admin são sempre funcionário — só existe um administrador.
-    const username = await generateUsername(prisma, name);
-    user = await prisma.user.create({ data: { name, email: email.toLowerCase(), username, passwordHash, role: 'CASHIER', permissions } });
-  } catch (err) {
-    if (err.code === 'P2002') throw httpError(409, 'Já existe um usuário com este e-mail.');
-    throw err;
-  }
+  // Contas criadas pelo admin são sempre funcionário — só existe um administrador.
+  const username = await generateUsername(prisma, name);
+  const user = await guardUnique(
+    () => prisma.user.create({ data: { name, email: email.toLowerCase(), username, passwordHash, role: 'CASHIER', permissions } }),
+    DUPLICATE.userEmail,
+  );
   res.status(201).json({ id: user.id, name: user.name, email: user.email, username: user.username, role: user.role, permissions: user.permissions, active: user.active });
 });
 

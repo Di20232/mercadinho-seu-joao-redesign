@@ -441,6 +441,14 @@ async function renderVendas() {
   await loadRecentSales();
 }
 
+// Unidades que aceitam fração (peso, volume, comprimento). As demais (UN,
+// PCT, CX…) só aceitam quantidade inteira. Mesma lista de src/units.js, que
+// é quem decide de verdade: ao mudar lá, mude aqui.
+const FRACTIONAL_UNITS = new Set(['KG', 'G', 'L', 'LT', 'ML', 'M', 'MT']);
+function allowsFraction(unit) {
+  return FRACTIONAL_UNITS.has(String(unit || '').trim().toUpperCase().replace(/\.$/, ''));
+}
+
 function addToCart(product) {
   const existing = cart.find((i) => i.productId === product.id);
   if (existing) {
@@ -502,10 +510,14 @@ function renderCart() {
     // dígito de "12" nunca chegava a ser digitado: o campo perdia o foco
     // assim que o "1" era digitado.
     const subtotalCell = el('td', { class: 'num' }, formatMoney(item.price * item.quantity));
+    const fracao = allowsFraction(item.unit);
     const qtyInput = el('input', {
-      type: 'number', min: '0.001', step: '0.001', value: String(item.quantity), 'aria-label': `Quantidade de ${item.name}`,
+      type: 'number', min: fracao ? '0.001' : '1', step: fracao ? '0.001' : '1', inputmode: fracao ? 'decimal' : 'numeric',
+      value: String(item.quantity), 'aria-label': `Quantidade de ${item.name}`,
       oninput: (e) => {
-        const v = parseFloat(e.target.value);
+        const lido = parseFloat(e.target.value);
+        // Produto vendido por unidade: arredonda para inteiro (meia caixa não existe).
+        const v = fracao ? Math.round(lido * 1000) / 1000 : Math.round(lido);
         item.quantity = Number.isFinite(v) && v > 0 ? v : item.quantity;
         subtotalCell.textContent = formatMoney(item.price * item.quantity);
         updateCartTotal();
