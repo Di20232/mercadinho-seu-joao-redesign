@@ -30,7 +30,7 @@ Ambiente: banco separado `mercadinho_joao_test_manual` (recriado do zero, com o 
 | 2 | Conferência da importação não mostrava troca de nome (a linha "Arroz Tipo 1 5kg (repetido)" renomeou o produto e baixou o mínimo de 10 para 5 sem aviso) | corrigido em `0e64fc4` |
 | 3 | Importação aceitava validade já vencida sem avisar | corrigido em `0e64fc4` (aviso, não erro) |
 | 4 | Planilha de movimentações: "Data/Hora" sem hora, no fuso do servidor, e tipo em inglês (`ENTRY`) | corrigido em `b304a1c` |
-| 5 | O cadastro público cria um caixa ativo na hora: publicado na internet, qualquer pessoa poderia entrar e registrar vendas | **decisão do Diego** (tarefa no ClickUp) |
+| 5 | O cadastro público cria um caixa ativo na hora: publicado na internet, qualquer pessoa poderia entrar e registrar vendas | Diego decidiu (25/11): a conta nasce **desativada** até o dono liberar. Feito em `a8824c7` |
 
 Cada correção tem teste automático que falha no código antigo e passa no novo, e as de tela foram conferidas no navegador.
 
