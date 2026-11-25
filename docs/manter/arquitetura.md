@@ -70,7 +70,7 @@ Um único processo Node faz tudo: API, arquivos estáticos e agendador. Não há
 |---|---|---|---|
 | Local com Docker | `docker compose`: contêineres `app` e `db` | Contêiner `postgres:16-alpine`, volume `mercadinho-seu-joao_mercadinho_joao_db_data`, porta 5433 no host | `http://localhost:3100` |
 | Local sem Docker | `npm run dev` | O do `.env` (normalmente o do Docker na 5433) | `http://localhost:3000` |
-| Nuvem (planejado) | Serviço web Node no Render ou Railway | PostgreSQL gerenciado (Neon ou Supabase) | domínio do provedor |
+| Nuvem (em produção desde 25/11/2026) | Serviço web Node no Render | PostgreSQL gerenciado no Neon | `https://mercadinho-do-joao.onrender.com` |
 
 Detalhes em [deploy e infraestrutura](../sustentar/deploy-e-infraestrutura.md).
 

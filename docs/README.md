@@ -4,7 +4,9 @@ Sistema web de vendas e estoque para um mercadinho de bairro (secos e molhados).
 
 Esta pasta organiza a documentação pelas quatro perguntas que alguém faz a um sistema: **como uso**, **como funciona**, **como mantenho no ar** e **como atualizo sem quebrar**. Cada documento responde a uma pergunta e tem um público certo.
 
-> Retrato do `master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026 (commit `0df94d5`, com os PRs #2 a #9 mesclados): permissões por pessoa, produto aguardando preço, venda idempotente e sem impasse, busca sem acento, relatório por e-mail e app instalável no celular. Suíte de testes: 72 de 72 passando nessa data. Atualizada depois com o PR #11 (cadastro com liberação do dono, validade e planilhas no horário da loja): 81 de 81. Com a retirada do relatório por e-mail, em 25/11: 79 de 79; com a planilha completa: 80 de 80.
+> Retrato do `master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026 (commit `89b7bdf`, com os PRs #2 a #15 mesclados): permissões por pessoa, produto aguardando preço, venda idempotente e sem impasse, busca sem acento, planilha completa dos relatórios e app instalável no celular, publicado na nuvem. Suíte de testes: 80 de 80 passando nessa data.
+
+**Em PDF:** [Documentacao-Mercadinho-do-Joao.pdf](Documentacao-Mercadinho-do-Joao.pdf), edição de 43 páginas com início rápido, manual, requisitos e regras, arquitetura, modelo de dados, API e deploy (gerada em 25/11/2026; não se atualiza sozinha).
 
 ## Mapa
 
@@ -29,7 +31,7 @@ A documentação descreve o sistema como ele é, inclusive o que ainda não exis
 | Pipeline de CI/CD | **Não existe.** Os testes rodam só na máquina do desenvolvedor. Ver [dívida técnica](evoluir/roadmap-e-divida-tecnica.md). |
 | Monitoramento e alertas de infraestrutura | **Não existe.** O [documento de monitoramento](sustentar/monitoramento.md) diz o que olhar hoje e o mínimo a montar. |
 | SLA e matriz de suporte | **Proposta**, a combinar com o cliente. |
-| Sistema em produção | **Ainda não publicado.** O passo a passo está pronto em [deploy](sustentar/deploy-e-infraestrutura.md). |
+| Sistema em produção | **Publicado em 25/11/2026** em `https://mercadinho-do-joao.onrender.com` (Render, plano grátis, e banco no Neon). O envio de e-mail **não está configurado**. Ver [deploy](sustentar/deploy-e-infraestrutura.md). |
 | Versões (tags SemVer) | **Não há tags.** O [changelog](evoluir/changelog.md) propõe a primeira. |
 
 ## Critérios de aceite desta documentação

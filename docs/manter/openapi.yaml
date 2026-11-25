@@ -3,7 +3,7 @@ info:
   title: Mercadinho do João - API
   version: "1.0.0"
   description: |
-    API de vendas e estoque do Mercadinho do João. Escrita a partir de `src/routes/*.js` no master de 25/11/2026 (commit 0df94d5).
+    API de vendas e estoque do Mercadinho do João. Escrita a partir de `src/routes/*.js` no master de 25/11/2026 (commit 0df94d5), atualizada até o commit 89b7bdf.
 
     - Sessão em cookie `mj_token` (JWT), definido por login ou auto-login. O cadastro público não abre sessão.
     - Todo POST, PUT, PATCH e DELETE exige o cabeçalho `X-Requested-With: fetch` (defesa contra CSRF).

@@ -4,12 +4,11 @@ O que precisa evoluir, por quê e em que ordem. Cada item de dívida tem um cód
 
 ## Roadmap
 
-### Agora: antes de publicar em produção
+### Agora: o sistema já está publicado (25/11/2026)
 
 | Item | Por quê | Esforço |
 |---|---|---|
-| Configurar o e-mail (SMTP) | Sem ele não há "esqueci minha senha" nem alerta diário (pendência da semana 12, depende da senha de app do Gmail) | pequeno |
-| Publicar na nuvem | O sistema ainda só roda local (pendência da semana 12, depende das contas no provedor) | médio |
+| Configurar o e-mail (SMTP) | Sem ele não há "esqueci minha senha" nem alerta diário. No Render grátis só pela porta 2525 | pequeno |
 | `npm audit fix` sem quebra (DT-08) | Fecha a vulnerabilidade crítica e as altas que não exigem versão maior | pequeno |
 | Node 22 na imagem e em `engines` (DT-07) | Node 20 está fora de suporte desde 30/04/2026 | pequeno |
 | Corrigir os dias em UTC (DT-01) | "Vendas hoje" e os relatórios por dia erram depois das 21h | médio |

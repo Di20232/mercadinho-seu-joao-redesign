@@ -53,7 +53,7 @@ Para levar os dados que já estão no computador da loja para o banco gerenciado
 5. Confira contagens (usuários, produtos, vendas) e a data da última venda, como no [ensaio de restauração](../sustentar/backup-e-continuidade.md#2-conferir).
 6. Pare de usar o sistema local, para não haver vendas nos dois lugares.
 
-Ainda não executado: o sistema não foi publicado.
+Ainda não executado: o sistema foi publicado em 25/11/2026 com um banco novo, sem migrar os dados locais.
 
 ## Node 20 para Node 22
 
