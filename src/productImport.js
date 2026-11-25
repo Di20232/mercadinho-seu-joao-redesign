@@ -4,6 +4,7 @@
 // do banco, e aponta linha a linha o que está errado — tudo antes de gravar
 // qualquer coisa.
 const { EXCEL_EPOCH_MS, MS_PER_DAY } = require('./spreadsheet');
+const { storeToday } = require('./storeTime');
 
 const FIELDS = [
   { key: 'name', label: 'Nome do produto', required: true },
@@ -232,9 +233,9 @@ function normalizeRow(cells, mapping, options) {
       values.expiryDate = parsed;
       // Aviso, não erro: a planilha pode estar registrando um lote que já
       // venceu e precisa sair da prateleira.
-      const now = new Date();
-      const today = toIsoDay(now.getFullYear(), now.getMonth() + 1, now.getDate());
-      if (parsed < today) warnings.push(`Validade ${parsed.split('-').reverse().join('/')} já passou.`);
+      // "Hoje" da loja: no relógio do servidor (UTC), das 21h à meia-noite de
+      // Brasília já é amanhã, e o produto que vence hoje sairia como vencido.
+      if (parsed < storeToday()) warnings.push(`Validade ${parsed.split('-').reverse().join('/')} já passou.`);
     }
   }
 
