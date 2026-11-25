@@ -6,7 +6,7 @@ const { authenticate } = require('../auth');
 const { requirePermission } = require('../permissions');
 const { parseDateParam, parseEnumParam, clampIntParam } = require('../queryHelpers');
 const { applyStockDelta } = require('../stockOps');
-const { generateCsv, generateXlsx } = require('../exportService');
+const { generateCsv, generateXlsx, storeDateTime } = require('../exportService');
 
 const router = express.Router();
 // Movimentações de estoque (entradas de compra e ajustes/perdas) são
@@ -79,14 +79,6 @@ const TYPE_LABELS = { ENTRY: 'Entrada', SALE: 'Venda', ADJUSTMENT: 'Ajuste', LOS
 // Exportar tudo (164 mil linhas) levou 34 s e 1,1 GB, travando o site para todos;
 // 20 mil levam ~3 s. Acima disso a planilha avisa que está cortada.
 const EXPORT_LIMIT = 20_000;
-
-// Planilha de movimentações: data com hora no horário da loja. Formatar no
-// fuso do servidor (UTC numa hospedagem) jogava uma venda das 22h para o dia
-// seguinte, e o CSV mostrava só a data.
-const EXPORT_DATE_TIME = new Intl.DateTimeFormat('pt-BR', {
-  timeZone: 'America/Sao_Paulo',
-  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-});
 
 async function sendExport(res, format, filenamePrefix, sheetName, headers, rows) {
   const fmt = (format || 'csv').toLowerCase();
@@ -177,7 +169,9 @@ router.get('/movements/export', async (req, res) => {
 
   const headers = ['Data/Hora', 'Produto', 'Tipo', 'Quantidade', 'Estoque Anterior', 'Novo Estoque', 'Motivo', 'Usuário'];
   const rows = movements.map((m) => [
-    EXPORT_DATE_TIME.format(m.createdAt).replace(',', ''),
+    // Horário da loja: no fuso do servidor (UTC numa hospedagem) uma venda das
+    // 22h ia para o dia seguinte. No Excel continua sendo data, e não texto.
+    storeDateTime(m.createdAt),
     m.product.name,
     TYPE_LABELS[m.type] || m.type,
     Number(m.quantity),

@@ -1353,6 +1353,21 @@ test('exportação: movimentações saem com data e hora de Brasília e o tipo e
 
   const expected = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
   assert.ok(line.startsWith(expected), `data esperada em Brasília: ${expected}, veio: ${line.slice(0, 16)}`);
+
+  // No Excel a mesma coluna é data de verdade, e não texto: só assim ordena e
+  // filtra por data (em texto, "01/12" vinha antes de "25/11").
+  const xlsx = await fetch(`${baseUrl}/api/stock/movements/export?format=xlsx&productId=${product.body.id}`, {
+    headers: { Cookie: adminJar.header(), 'X-Requested-With': 'fetch' },
+  });
+  assert.equal(xlsx.status, 200);
+  const ExcelJS = require('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(await xlsx.arrayBuffer()));
+  const cell = workbook.worksheets[0].getCell('A2');
+  assert.ok(cell.value instanceof Date, `Data/Hora deveria ser data no Excel, veio ${typeof cell.value}: ${cell.value}`);
+  assert.equal(cell.numFmt, 'dd/mm/yyyy hh:mm');
+  const [dia, mes, ano] = expected.split('/');
+  assert.equal(cell.value.toISOString().slice(0, 10), `${ano}-${mes}-${dia}`, 'o dia no Excel é o de Brasília');
 });
 
 // Com o sistema na internet, o cadastro público não pode dar acesso sozinho:
