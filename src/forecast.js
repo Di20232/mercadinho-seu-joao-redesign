@@ -32,7 +32,7 @@ async function getStockForecast() {
       currentStock,
       minStock,
       avgDailySales: Number(avgDaily.toFixed(3)),
-      daysUntilStockout: daysUntilStockout !== null ? Number(daysUntilStockout.toFixed(1)) : null,
+      daysUntilStockout: daysUntilStockout !== null ? Math.round(daysUntilStockout) : null,
       lowStock: currentStock <= minStock,
     };
   });
