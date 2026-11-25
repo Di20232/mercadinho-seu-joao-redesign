@@ -4,7 +4,7 @@ const { authenticate } = require('../auth');
 const { requirePermission } = require('../permissions');
 const { getStockForecast, getSlowMovingProducts } = require('../forecast');
 const { parseDateParam, clampIntParam } = require('../queryHelpers');
-const { generateCsv, generateXlsx } = require('../exportService');
+const { generateCsv, generateXlsx, generateWorkbook } = require('../exportService');
 
 const router = express.Router();
 router.use(authenticate, requirePermission('reports.view'));
@@ -136,6 +136,40 @@ router.get('/slow-moving/export', async (req, res) => {
   const rows = slowRows(await getSlowMovingProducts(days));
 
   await sendExport(res, req.query.format, `produtos-parados_${days}dias`, 'Produtos Parados', headers, rows);
+});
+
+// Planilha completa do período: um Excel com uma aba por relatório.
+router.get('/export', async (req, res) => {
+  const where = saleWhere(req.query);
+  const [{ total, count, byDay }, top, slow, forecast] = await Promise.all([
+    salesByDay(where), topProducts(where, 50), getSlowMovingProducts(60), getStockForecast(),
+  ]);
+  const { from, to } = req.query;
+  const brDate = (value) => parseDateParam(value, 'data').toISOString().slice(0, 10).split('-').reverse().join('/');
+  const period = from || to ? `${from ? brDate(from) : 'o início'} a ${to ? brDate(to) : 'hoje'}` : 'todo o período';
+  const capital = slow.reduce((sum, p) => sum + p.capitalParado, 0);
+
+  const summary = [
+    ['Período', period],
+    ['Total vendido (R$)', Number(total.toFixed(2))],
+    ['Vendas', count],
+    ['Ticket médio (R$)', count ? Number((total / count).toFixed(2)) : 0],
+    ['Produtos parados há 60 dias', slow.length],
+    ['Capital parado (R$)', Number(capital.toFixed(2))],
+    ['Produtos abaixo do estoque mínimo', forecast.filter((p) => p.lowStock).length],
+  ];
+  const buffer = await generateWorkbook([
+    { name: 'Resumo', headers: ['Indicador', 'Valor'], rows: summary },
+    { name: 'Vendas por dia', headers: BY_DAY_HEADERS, rows: byDayRows(byDay) },
+    { name: 'Mais vendidos', headers: TOP_HEADERS, rows: topRows(top) },
+    { name: 'Produtos parados', headers: SLOW_HEADERS, rows: slowRows(slow) },
+    { name: 'Previsão de estoque', headers: FORECAST_HEADERS, rows: forecastRows(forecast) },
+  ]);
+
+  const suffix = from || to ? `${from || 'inicio'}_a_${to || 'fim'}` : 'geral';
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="relatorio_${suffix}.xlsx"`);
+  res.send(buffer);
 });
 
 module.exports = router;

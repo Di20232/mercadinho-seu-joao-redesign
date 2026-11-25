@@ -762,6 +762,19 @@ paths:
         '200': { $ref: '#/components/responses/FileExport' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /reports/export:
+    get:
+      tags: [reports]
+      summary: Baixar a planilha completa do período (reports.view)
+      description: Um XLSX com as abas Resumo, Vendas por dia, Mais vendidos (50), Produtos parados (60 dias) e Previsão de estoque.
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date }, description: Inclui o dia inteiro. }
+      responses:
+        '200': { $ref: '#/components/responses/FileExport' }
+        '400': { $ref: '#/components/responses/Validation' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /users/permissions:
     get:
       tags: [users]

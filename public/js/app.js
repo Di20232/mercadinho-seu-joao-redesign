@@ -1396,6 +1396,7 @@ async function loadReports() {
 
   document.getElementById('rep-export-summary').href = `/api/reports/sales-summary/export?${qs.toString()}&format=xlsx`;
   document.getElementById('rep-export-top').href = `/api/reports/top-products/export?${qs.toString()}&format=xlsx`;
+  document.getElementById('rep-export-all').href = `/api/reports/export?${qs.toString()}`;
   skeletonRows(document.getElementById('rep-top-products'), 4, 5);
   skeletonRows(document.getElementById('rep-by-day'), 2, 5);
 
