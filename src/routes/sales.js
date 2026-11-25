@@ -14,7 +14,8 @@ function canCancelSale(user, sale, now = Date.now()) {
   return sale.sellerId === user.sub && ageMinutes <= OWN_SALE_CANCEL_MINUTES;
 }
 const { parseDateParam, clampIntParam } = require('../queryHelpers');
-const { applyStockDelta } = require('../stockOps');
+const { applyStockDelta, lockProducts } = require('../stockOps');
+const { allowsFraction } = require('../units');
 
 const router = express.Router();
 router.use(authenticate);
@@ -31,7 +32,11 @@ const saleSchema = z.object({
     .array(
       z.object({
         productId: z.string().uuid(),
-        quantity: z.number().finite().positive().max(10_000),
+        // No máximo 3 casas decimais, como a coluna Decimal(12,3). Antes,
+        // 0,0004 passava no positive(), era gravado como 0 e virava uma
+        // venda de R$ 0,00 que contava nos relatórios.
+        quantity: z.number().finite().positive().max(10_000)
+          .refine((q) => Math.abs(q * 1000 - Math.round(q * 1000)) < 1e-6, 'Use no máximo 3 casas decimais na quantidade.'),
       }),
     )
     .min(1, 'A venda precisa de ao menos um item.')
@@ -100,11 +105,15 @@ router.post('/', validate(saleSchema), async (req, res) => {
   const sale = await prisma.$transaction(async (tx) => {
     const created = await tx.sale.create({ data: { sellerId: req.user.sub, totalAmount: '0', idempotencyKey } });
 
+    // Trava todos os produtos da venda de uma vez, sempre na mesma ordem
+    // (evita o deadlock entre carrinhos com os mesmos itens em ordem
+    // diferente), e só DEPOIS lê o estoque: com as linhas travadas até o fim
+    // da transação, o saldo lido é o de verdade. Antes, a leitura vinha
+    // antes da trava e vendas simultâneas gravavam todas "5→4" no histórico.
+    await lockProducts(tx, productIds);
+
     // Uma única consulta para todos os itens, em vez de um SELECT por item
-    // dentro do laço (N+1). Numa venda de 20 itens isso troca 20 idas ao
-    // banco por 1 só, encurtando a duração da transação — o que também
-    // reduz o tempo que a linha de cada produto fica travada pelo UPDATE
-    // atômico logo abaixo.
+    // dentro do laço (N+1).
     const products = await tx.product.findMany({ where: { id: { in: productIds } } });
     const productById = new Map(products.map((p) => [p.id, p]));
 
@@ -116,21 +125,33 @@ router.post('/', validate(saleSchema), async (req, res) => {
       if (product.salePrice === null || product.costPrice === null) {
         throw httpError(409, `"${product.name}" ainda está aguardando preço e não pode ser vendido.`);
       }
+      if (!allowsFraction(product.unit) && !Number.isInteger(item.quantity)) {
+        throw httpError(400, `"${product.name}" é vendido por ${product.unit}: use uma quantidade inteira.`);
+      }
 
-      // UPDATE condicional atômico: só decrementa se houver saldo suficiente.
-      // A checagem "currentStock >= quantity" é avaliada e aplicada pelo banco
-      // dentro do mesmo statement/transação, o que evita venda com estoque
-      // negativo mesmo sob concorrência (duas vendas simultâneas do mesmo item).
+      // Saldo lido com a linha já travada por esta transação (lockProducts):
+      // ninguém mais consegue mudá-lo até o commit.
+      const previousStock = Number(product.currentStock);
+      if (previousStock < item.quantity) {
+        throw httpError(409, `Estoque insuficiente para "${product.name}" (disponível: ${previousStock}).`);
+      }
+      const newStock = Math.round((previousStock - item.quantity) * 1000) / 1000;
+
+      // UPDATE condicional atômico mantido como segunda barreira: só
+      // decrementa se houver saldo suficiente, avaliado pelo próprio banco.
       const updateResult = await tx.product.updateMany({
         where: { id: item.productId, currentStock: { gte: item.quantity } },
         data: { currentStock: { decrement: item.quantity } },
       });
       if (updateResult.count === 0) {
-        throw httpError(409, `Estoque insuficiente para "${product.name}" (disponível: ${Number(product.currentStock)}).`);
+        throw httpError(409, `Estoque insuficiente para "${product.name}" (disponível: ${previousStock}).`);
       }
 
       const unitPrice = Number(product.salePrice);
       const subtotal = unitPrice * item.quantity;
+      if (Math.round(subtotal * 100) === 0) {
+        throw httpError(400, `A quantidade de "${product.name}" é pequena demais: o item sairia por R$ 0,00.`);
+      }
       total += subtotal;
       // Barreira de segurança: nunca deixa o total computado em memória chegar
       // perto da capacidade da coluna numeric(12,2) do banco. Sem isso, uma
@@ -154,8 +175,8 @@ router.post('/', validate(saleSchema), async (req, res) => {
           productId: item.productId,
           type: 'SALE',
           quantity: (-item.quantity).toFixed(3),
-          previousStock: product.currentStock,
-          newStock: (Number(product.currentStock) - item.quantity).toFixed(3),
+          previousStock: previousStock.toFixed(3),
+          newStock: newStock.toFixed(3),
           reason: 'Venda',
           userId: req.user.sub,
           saleId: created.id,
@@ -259,6 +280,10 @@ router.post('/:id/cancel', async (req, res) => {
       throw httpError(403, `Você só pode cancelar a sua própria venda até ${OWN_SALE_CANCEL_MINUTES} minutos depois de fechá-la.`);
     }
     if (existing.canceled) throw httpError(409, 'Venda já cancelada.');
+
+    // Mesma ordem de trava da venda: um cancelamento e uma venda com os
+    // mesmos produtos não podem travar um ao outro.
+    await lockProducts(tx, [...new Set(existing.items.map((i) => i.productId))]);
 
     for (const item of existing.items) {
       // requireActive:false — a venda pode ter sido de um produto já
