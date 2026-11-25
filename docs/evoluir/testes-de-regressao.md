@@ -1,6 +1,6 @@
 # Testes de regressão
 
-A suíte que prova que uma atualização não quebrou nada: 72 testes automatizados mais um roteiro manual curto para o que os testes não alcançam (as telas).
+A suíte que prova que uma atualização não quebrou nada: 81 testes automatizados mais um roteiro manual curto para o que os testes não alcançam (as telas).
 
 ## Como rodar
 
@@ -19,12 +19,13 @@ A suíte apaga o banco de teste antes de rodar e recusa bancos sem `test` no nom
 | 24/11/2026 | `2e99c72` (antes do rebase) | 22.23.2 | 48/48 | 10,7 s |
 | 24/11/2026 | `84e5186` | 22.23.2 | 54/54 | 9,7 s |
 | 25/11/2026 | `master` (`0df94d5`) + docs | 22.23.2 | **72/72** | 14,1 s |
+| 25/11/2026 | PR #11 + docs (`f33e8fc`) | 24.19.0 | **81/81**, também com `TZ=UTC` | 11,8 s |
 
 Registre aqui cada execução antes de um deploy.
 
 ## O que cada teste protege
 
-`I` = `test/integration.test.js` (55 testes, HTTP real contra PostgreSQL real). `S` = `test/security.test.js` (8 testes, sem banco). `U` = testes de unidade sem banco: `retryStaleRead.test.js` (3), `historyGenerator.test.js` (4), `exportService.test.js` (2). A coluna "Regra" aponta para [requisitos e regras](../manter/requisitos-e-regras.md).
+`I` = `test/integration.test.js` (59 testes, HTTP real contra PostgreSQL real). `S` = `test/security.test.js` (8 testes, sem banco). `U` = testes de unidade sem banco: `retryStaleRead.test.js` (3), `historyGenerator.test.js` (4), `exportService.test.js` (4), `storeTime.test.js` (3). A coluna "Regra" aponta para [requisitos e regras](../manter/requisitos-e-regras.md).
 
 | # | Teste | Arquivo | Regra |
 |---|---|---|---|
@@ -100,6 +101,15 @@ Registre aqui cada execução antes de um deploy.
 | 70 | histórico: venda cancelada tem a baixa e a devolução, e não mexe no saldo | U | RN-41 |
 | 71 | CSV: ";", aspas e quebra de linha no texto não deslocam as colunas | U | RN-25 |
 | 72 | CSV: fórmulas continuam neutralizadas e números ficam com vírgula | U | RN-25 |
+| 73 | validade: alerta diário inclui o produto que vence hoje, com a data certa | I | RN-33 |
+| 74 | importação: conferência avisa troca de nome, mínimo, categoria e validade vencida | I | RN-26 |
+| 75 | exportação: movimentações saem com data e hora de Brasília e o tipo em português (CSV em texto, XLSX como data) | I | RN-25 |
+| 76 | cadastro público: conta nasce desativada, sem sessão, e só entra depois que o dono libera | I | RN-15, RN-18 |
+| 77 | CSV: data e hora saem em texto, no horário da loja | U | RN-25 |
+| 78 | Excel: data e hora continuam sendo data (ordena e filtra), no horário da loja | U | RN-25 |
+| 79 | horário da loja: "hoje" é o dia de Brasília, não o do servidor | U | RN-26 |
+| 80 | horário da loja: data e hora em texto, no formato brasileiro | U | RN-25 |
+| 81 | horário da loja: relógio de Brasília guardado nos campos UTC (para o Excel) | U | RN-25 |
 
 Os testes 60 a 62 (`security.test.js`) leem o código-fonte ou repetem a lógica, em vez de exercitar o servidor; quebram com uma simples renomeação. O comportamento equivalente está coberto pelos testes 3 e 8.
 

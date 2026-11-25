@@ -121,7 +121,7 @@ Todos os `id` são UUID gerados pelo Prisma e guardados como `text`. Datas são 
 | `salePrice` | decimal(12,2), nulo | > 0, até 1.000.000. Nulo = aguardando preço; produto assim não é vendido |
 | `currentStock` | decimal(12,3) | entre 0 e 50.000.000; só muda por movimentação |
 | `minStock` | decimal(12,3) | ≥ 0 |
-| `expiryDate` | timestamp, nulo | gravado como meia-noite UTC do dia |
+| `expiryDate` | timestamp, nulo | gravado como meia-noite UTC do dia; a tela e o e-mail o leem sempre em UTC (`formatDateOnly`), senão Brasília mostraria o dia anterior |
 | `active` | boolean | exclusão lógica ([ADR-0006](adr/0006-exclusao-logica-de-produto.md)); indexado |
 | `updatedAt` | timestamp | atualizado pelo Prisma |
 
@@ -163,7 +163,7 @@ Todos os `id` são UUID gerados pelo Prisma e guardados como `text`. Datas são 
 | Dado | Quem cria | Por onde |
 |---|---|---|
 | Admin | `npm run seed` | variáveis `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` |
-| Pessoa da equipe e suas permissões | dono (tela Usuários) ou a própria pessoa ("Criar conta", sem permissões) | `POST /api/users`, `PUT /api/users/:id`, `POST /api/auth/register` |
+| Pessoa da equipe e suas permissões | dono (tela Usuários) ou a própria pessoa ("Criar conta", sem permissões e com `active = false` até o dono ligar) | `POST /api/users`, `PUT /api/users/:id`, `POST /api/auth/register` |
 | Produto | quem tem `products.manage` (sem preço) ou `prices.manage` (tela Produtos ou Importar) | `POST /api/products`, `POST /api/imports/products/commit` |
 | Preço de um produto aguardando preço | quem tem `prices.manage` | `PUT /api/products/:id` |
 | Venda e itens | qualquer pessoa logada | `POST /api/sales` |

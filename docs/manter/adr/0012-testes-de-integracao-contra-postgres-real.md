@@ -13,7 +13,7 @@ Os bugs mais graves encontrados na auditoria (corrida de estoque, sessão não r
 - `test/integration.test.js` sobe o `app` do Express numa porta aleatória e faz requisições HTTP reais contra um PostgreSQL real.
 - Antes de rodar, `resetDb()` apaga todas as tabelas, mas **recusa** se o nome do banco em `DATABASE_URL` não contiver `test` (ou sem `ALLOW_DB_RESET=true`).
 - `test/security.test.js` cobre JWT, CORS, cálculo de preço e a configuração de produção, sem banco.
-- Com `NODE_ENV=test`, os limites de tentativa de login, cadastro e senha ficam desligados para a suíte não tomar 429.
+- Com `NODE_ENV=test`, os limites de tentativa de login, cadastro e senha ficam desligados para a suíte não tomar 429. O limite geral da API (300 por minuto) sobe só dentro da suíte (`API_RATE_LIMIT_MAX`, PR #11); produção segue com o padrão.
 
 ## Consequências
 

@@ -26,11 +26,11 @@ Ambiente: banco separado `mercadinho_joao_test_manual` (recriado do zero, com o 
 
 | # | Achado | Situação |
 |---|---|---|
-| 1 | Validade aparecia **um dia antes** (gravada como meia-noite UTC e lida no fuso local); selo de vencido e "dias para vencer" também; o alerta diário pulava o produto que vence hoje | corrigido em `1bfd40f` |
-| 2 | Conferência da importação não mostrava troca de nome (a linha "Arroz Tipo 1 5kg (repetido)" renomeou o produto e baixou o mínimo de 10 para 5 sem aviso) | corrigido em `0e64fc4` |
-| 3 | Importação aceitava validade já vencida sem avisar | corrigido em `0e64fc4` (aviso, não erro) |
-| 4 | Planilha de movimentações: "Data/Hora" sem hora, no fuso do servidor, e tipo em inglês (`ENTRY`) | corrigido em `b304a1c` |
-| 5 | O cadastro público cria um caixa ativo na hora: publicado na internet, qualquer pessoa poderia entrar e registrar vendas | Diego decidiu (25/11): a conta nasce **desativada** até o dono liberar. Feito em `a8824c7` |
+| 1 | Validade aparecia **um dia antes** (gravada como meia-noite UTC e lida no fuso local); selo de vencido e "dias para vencer" também; o alerta diário pulava o produto que vence hoje | corrigido em `fedb477` |
+| 2 | Conferência da importação não mostrava troca de nome (a linha "Arroz Tipo 1 5kg (repetido)" renomeou o produto e baixou o mínimo de 10 para 5 sem aviso) | corrigido em `e1bf58f` |
+| 3 | Importação aceitava validade já vencida sem avisar | corrigido em `e1bf58f` (aviso, não erro; desde `f33e8fc`, pelo dia de Brasília) |
+| 4 | Planilha de movimentações: "Data/Hora" sem hora, no fuso do servidor, e tipo em inglês (`ENTRY`) | corrigido em `04bca1a`; no XLSX a Data/Hora é data, e não texto, desde `8c4e3ed` |
+| 5 | O cadastro público cria um caixa ativo na hora: publicado na internet, qualquer pessoa poderia entrar e registrar vendas | Diego decidiu (25/11): a conta nasce **desativada** até o dono liberar. Feito em `08843e7` ([ADR-0020](docs/manter/adr/0020-cadastro-publico-nasce-desativado.md)) |
 
 Cada correção tem teste automático que falha no código antigo e passa no novo, e as de tela foram conferidas no navegador.
 

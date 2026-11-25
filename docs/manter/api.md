@@ -10,7 +10,7 @@ O sistema não publica eventos nem mensagens assíncronas. A única saída fora 
 |---|---|
 | Base | `/api` na mesma origem das telas (ex.: `http://localhost:3100/api`) |
 | Formato | `application/json` nos dois sentidos. Exceções: upload de planilha (`multipart/form-data`) e exportações (CSV ou XLSX) |
-| Autenticação | Cookie `mj_token` (JWT), definido por `POST /api/auth/login`, `/register` e `/auto-login`. Sem cookie válido: **401** |
+| Autenticação | Cookie `mj_token` (JWT), definido por `POST /api/auth/login` e `/auto-login` (o `/register` não abre sessão). Sem cookie válido: **401** |
 | CSRF | Todo `POST`, `PUT`, `PATCH` e `DELETE` precisa do cabeçalho `X-Requested-With: fetch`. Sem ele: **403** "Requisição bloqueada." |
 | Autorização | Por permissão ([lista](requisitos-e-regras.md#permissões)). O dono (`ADMIN`) tem todas. Sem a permissão: **403** "Sem permissão para executar esta ação." |
 | CORS | Aceita a própria origem e as de `CLIENT_ORIGIN`, com credenciais. Cabeçalhos aceitos: `Content-Type`, `Authorization`, `X-Requested-With`, `Idempotency-Key` |
@@ -28,7 +28,7 @@ Todo erro responde `{ "error": "mensagem em português" }`. Erros de validação
 |---|---|
 | 400 | Validação, parâmetro inválido, `Idempotency-Key` malformada, regra de negócio (ex.: estoque ficaria negativo num ajuste) |
 | 401 | Sem sessão, sessão expirada, conta desativada, senha trocada; login errado |
-| 403 | Falta `X-Requested-With`; falta permissão; venda de outra pessoa; cancelamento fora do prazo de 10 minutos; preço enviado por quem não define preços; auto-login com conta que não é caixa puro |
+| 403 | Login de conta desativada com a senha certa; falta `X-Requested-With`; falta permissão; venda de outra pessoa; cancelamento fora do prazo de 10 minutos; preço enviado por quem não define preços; auto-login com conta que não é caixa puro |
 | 404 | Recurso não existe ou está inativo para quem não cadastra produtos; rota desconhecida ("Não encontrado.") |
 | 409 | Estoque insuficiente; produto aguardando preço na venda; venda já cancelada; e-mail ou código de barras já cadastrado; conflito raro entre duas confirmações |
 | 422 | `Idempotency-Key` já usada em outra venda (outro carrinho ou outro usuário) |
@@ -61,8 +61,8 @@ Coluna "Acesso": **público** (sem sessão), **logado** (qualquer pessoa), o nom
 
 | Método e rota | Acesso | Corpo | Resposta |
 |---|---|---|---|
-| `POST /login` | público | `{ login, password }` (`login` = e-mail ou usuário; `email` é aceito como apelido de `login`) | 200 `{ id, name, email, username, role }` + cookie. 401 "Login incorreto." ou "Senha incorreta." |
-| `POST /register` | público | `{ name, email, password }` (nenhum outro campo) | 201 conta `CASHIER` sem permissões + cookie. 409 se o e-mail existe |
+| `POST /login` | público | `{ login, password }` (`login` = e-mail ou usuário; `email` é aceito como apelido de `login`) | 200 `{ id, name, email, username, role }` + cookie. 401 "Login incorreto." (não existe, ou conta desativada com senha errada) ou "Senha incorreta.". 403 com mensagem própria para conta desativada com a senha certa |
+| `POST /register` | público | `{ name, email, password }` (nenhum outro campo) | 201 `{ id, name, email, username, role, active: false, message }`: conta `CASHIER` sem permissões e **desativada**, **sem cookie**. Entra depois que o dono liga a conta. 409 se o e-mail existe |
 | `POST /forgot-password` | público | `{ email }` | 200 sempre com a mesma `message`, exista o e-mail ou não |
 | `POST /reset-password` | público | `{ token, password }` | 200 `{ message }`. 400 link inválido, expirado ou usado |
 | `POST /auto-login` | público | nenhum | 200 + cookie, só com `AUTO_LOGIN_ENABLED=true` fora de produção e conta `CASHIER` sem permissões. 404 se desligado |
@@ -95,7 +95,7 @@ Coluna "Acesso": **público** (sem sessão), **logado** (qualquer pessoa), o nom
 | `POST /entries` | `{ productId, quantity > 0, reason? }`. 201 `{ productId, currentStock }` |
 | `POST /adjustments` | `{ productId, quantity ≠ 0, reason, type: ADJUSTMENT \| LOSS }`. Quantidade com sinal: negativa remove |
 | `GET /movements` | Filtros `productId`, `type` (`ENTRY`, `SALE`, `ADJUSTMENT`, `LOSS`), `from`, `to`. Sem paginação devolve as 200 mais recentes; com `page`/`pageSize`, `{ totalCount, page, pageSize, movements }` |
-| `GET /movements/export` | Mesmos filtros (o `to` inclui o dia inteiro), `format=csv` (padrão) ou `xlsx`. Até 20.000 linhas mais recentes; se houver mais, uma linha final de aviso. Tipo em português |
+| `GET /movements/export` | Mesmos filtros (o `to` inclui o dia inteiro), `format=csv` (padrão) ou `xlsx`. Até 20.000 linhas mais recentes; se houver mais, uma linha final de aviso. Tipo em português. Data/Hora no horário de Brasília: texto `dd/mm/aaaa hh:mm` no CSV, data de verdade (formato `dd/mm/yyyy hh:mm`) no XLSX |
 
 ### Painel: `/api/dashboard`
 
@@ -129,7 +129,7 @@ Coluna "Acesso": **público** (sem sessão), **logado** (qualquer pessoa), o nom
 |---|---|
 | `GET /products/template` | Baixa `modelo-produtos.xlsx` |
 | `POST /products/parse` | `multipart/form-data` com o campo `file`, **ou** JSON `{ text }` com os dados colados. Devolve `{ headers, rows, mapping, fields }`. Não grava |
-| `POST /products/preview` | `{ headers, rows, mapping, options }`. Devolve `{ summary, items }`. Não grava |
+| `POST /products/preview` | `{ headers, rows, mapping, options }`. Devolve `{ summary, items }`. Não grava. Em produto existente, `items[].warnings` diz o que a linha muda além de preço e estoque (nome, categoria, unidade, mínimo, validade); validade anterior ao dia de hoje em Brasília também avisa |
 | `POST /products/commit` | Mesmo corpo. Grava e devolve `{ created, updated, skipped, failed, failures }` |
 
 `options`: `mode` (`upsert` padrão, `createOnly`, `updateOnly`), `matchBy` (`barcode` padrão, `name`), `stockMode` (`ignore` padrão, `set`, `add`). `mapping`: para cada campo (`name`, `barcode`, `category`, `unit`, `costPrice`, `salePrice`, `stock`, `minStock`, `expiryDate`), o índice da coluna, a partir de 0.

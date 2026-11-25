@@ -25,6 +25,7 @@ As decisões abaixo foram reconstruídas em 24/11/2026 a partir do código, dos 
 | [0017](0017-travar-produtos-da-venda-em-ordem.md) | Travar os produtos da venda de uma vez, em ordem fixa | Aceito | 24/11/2026 |
 | [0018](0018-app-instalavel-sem-cache-de-dados.md) | App instalável (PWA) sem guardar dados no aparelho | Aceito | 24/11/2026 |
 | [0019](0019-repetir-leitura-com-conexao-morta.md) | Repetir só as leituras quando a conexão do banco morreu | Aceito | 06/11/2026 |
+| [0020](0020-cadastro-publico-nasce-desativado.md) | Conta do cadastro público nasce desativada | Aceito | 25/11/2026 |
 
 ## Modelo para um ADR novo
 
