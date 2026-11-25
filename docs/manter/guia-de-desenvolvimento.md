@@ -109,13 +109,13 @@ No PowerShell:
 $env:DATABASE_URL = "postgresql://postgres:changeme_local_only@localhost:5433/mercadinho_joao_test?schema=public"; npm test
 ```
 
-A variável do terminal vale mais que a do `.env` (o `dotenv` não sobrescreve o que já existe). Resultado esperado, conferido em 25/11/2026 no `master` (`0df94d5`):
+A variável do terminal vale mais que a do `.env` (o `dotenv` não sobrescreve o que já existe). Resultado esperado, conferido em 25/11/2026 no `master` (`89b7bdf`):
 
 ```
-# tests 72
-# pass 72
+# tests 80
+# pass 80
 # fail 0
-# duration_ms 14122
+# duration_ms 12830
 ```
 
 O `npm test` roda seis arquivos: `integration.test.js` (precisa do banco), `security.test.js`, e os testes de unidade `retryStaleRead.test.js`, `historyGenerator.test.js`, `exportService.test.js` e `storeTime.test.js`.

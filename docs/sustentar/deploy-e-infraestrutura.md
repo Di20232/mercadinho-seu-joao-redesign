@@ -2,19 +2,20 @@
 
 Onde o sistema roda, como publicar uma versão nova, onde ficam os segredos e todas as variáveis de ambiente.
 
-## Situação em 24/11/2026
+## Situação em 25/11/2026
 
 | Item | Situação |
 |---|---|
 | Ambiente local (Docker) | Em uso na máquina do desenvolvedor: `http://localhost:3100` |
-| Produção na nuvem | **Ainda não publicado.** Passo a passo pronto abaixo |
-| Pipeline CI/CD | **Não existe.** Build, teste e deploy são manuais |
-| Infraestrutura como código | Só o `docker-compose.yml` (ambiente local) e o `Dockerfile` |
-| Domínio e HTTPS | A definir; o provedor de nuvem fornece HTTPS no domínio dele |
+| Produção na nuvem | **Publicado em 25/11/2026:** `https://mercadinho-do-joao.onrender.com` (Render free, Virginia; Neon, AWS us-east-1) |
+| Pipeline CI/CD | **Não existe** esteira de testes. O Render publica a cada merge no `master`; os testes são rodados à mão |
+| Infraestrutura como código | `render.yaml` (produção), `docker-compose.yml` e `Dockerfile` (ambiente local) |
+| Domínio e HTTPS | HTTPS no endereço do Render; domínio próprio a definir |
+| E-mail | **Não configurado.** O Render grátis bloqueia as portas 25, 465 e 587: é preciso um provedor que aceite a 2525 ou um plano pago |
 
 ## Ambientes
 
-| | Local Docker | Local Node | Produção (planejada) |
+| | Local Docker | Local Node | Produção |
 |---|---|---|---|
 | Sobe com | `docker compose up -d --build` | `npm run dev` | provedor builda do repositório |
 | App | contêiner `app`, imagem `node:20-bookworm-slim`, porta 3100 no host | Node da máquina, porta 3000 | serviço web Node (Render ou Railway) |
@@ -62,7 +63,7 @@ Depois do primeiro acesso, o dono cria as contas da equipe em Usuários, escolhe
 
 Sem CI, o roteiro é manual:
 
-1. Na máquina do desenvolvedor, com a branch atualizada: `npm test` no banco de teste (72/72 em 25/11/2026).
+1. Na máquina do desenvolvedor, com a branch atualizada: `npm test` no banco de teste (80/80 em 25/11/2026).
 2. Se houver migration nova, leia o SQL e faça um backup do banco de produção antes ([backup](backup-e-continuidade.md)).
 3. Merge do PR em `master`.
 4. No provedor, o deploy dispara pelo push em `master` (ou manualmente no painel). O build aplica as migrations.
@@ -131,4 +132,4 @@ O contêiner `app` **não lê o `.env` inteiro**: recebe só o que está em `env
 
 ## Requisitos de recursos
 
-Não medidos. Referência: um processo Node e um PostgreSQL pequenos; os planos gratuitos dos provedores citados comportam o volume de um mercadinho. A suíte completa de 72 testes roda em cerca de 14 s numa máquina de desenvolvimento.
+Não medidos. Referência: um processo Node e um PostgreSQL pequenos; os planos gratuitos dos provedores citados comportam o volume de um mercadinho. A suíte completa de 80 testes roda em cerca de 13 s numa máquina de desenvolvimento.

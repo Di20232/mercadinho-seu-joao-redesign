@@ -20,7 +20,7 @@ Com o que o sistema funciona. Cada linha diz se foi **testado** (rodou e funcion
 |---|---|
 | Windows 11 + Docker Desktop 29 (desenvolvimento) | **testado** em 24/11/2026 |
 | Debian 12 bookworm (imagem `node:20-bookworm-slim`) | **testado** (é a imagem do contêiner) |
-| Linux de provedor de nuvem (Render, Railway) | declarado; build e start conferidos localmente no modo de produção em 24/11/2026, mas não publicado |
+| Linux de provedor de nuvem (Render) | **em produção** desde 25/11/2026, com Node 22 |
 | macOS | declarado (nada específico de Windows no código; o `wait-for-db.sh` roda dentro do contêiner) |
 
 ## Navegadores

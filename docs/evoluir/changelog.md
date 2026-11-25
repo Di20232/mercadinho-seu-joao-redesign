@@ -16,7 +16,7 @@ O projeto ainda **não tem tags** e o `package.json` está parado em `1.0.0`. Pr
 
 ## [Não lançado]: candidata a 1.0.0
 
-`master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação, o PR #11 (correções do teste do sistema inteiro) e o PR #12 (Vendas no celular).
+`master` do repositório `Di20232/mercadinho-seu-joao-redesign` em 25/11/2026: PRs #2 a #9, mesclados entre 24 e 25/11, esta documentação, o PR #11 (correções do teste do sistema inteiro) o PR #12 (Vendas no celular) e os PRs #13 a #15 (publicação no Render e planilha completa no lugar do relatório por e-mail). Publicado em produção em 25/11/2026.
 
 ### Removido
 - **⚠ Quebra:** relatório por e-mail (botão "Enviar por e-mail" e `POST /api/reports/email`, que tinham entrado no PR #3). O envio não funcionava no Render grátis, que bloqueia as portas SMTP comuns. As planilhas continuam para baixar; nada a fazer na atualização.

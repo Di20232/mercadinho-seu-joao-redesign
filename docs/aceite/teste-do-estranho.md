@@ -19,7 +19,7 @@ Critério de aceite da documentação: **alguém que não participou do projeto 
 | 4 | Criar o dono e entrar | idem | Painel aparece |
 | 5 | Carregar dados de exemplo e as contas de teste | idem | 24 produtos; contas Financeiro, Estoque e Caixa |
 | 6 | Fazer e cancelar uma venda como caixa | [manual](../usar/manual-do-usuario.md#vendas) | estoque volta; histórico mostra as duas linhas |
-| 7 | Rodar os testes | [testes](../manter/guia-de-desenvolvimento.md#testes) | 72/72 |
+| 7 | Rodar os testes | [testes](../manter/guia-de-desenvolvimento.md#testes) | 80/80 |
 | 8 | Fazer um backup e restaurar num banco novo | [backup](../sustentar/backup-e-continuidade.md) | contagens iguais |
 | 9 | Simular um incidente: fechar o Docker Desktop e recuperar | [runbook](../sustentar/runbooks.md#o-sistema-não-abre-ou-o-login-dá-erro) | sistema de volta sem ajuda |
 | 10 | Publicar num ambiente de nuvem de teste | [deploy](../sustentar/deploy-e-infraestrutura.md#publicar-na-nuvem-primeira-vez) | endereço público com HTTPS, login e venda de teste |
