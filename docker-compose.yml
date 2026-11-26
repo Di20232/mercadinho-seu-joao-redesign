@@ -34,9 +34,10 @@ services:
     volumes:
       - mercadinho_joao_db_data:/var/lib/postgresql/data
     # 5433 no host: a porta 5432 costuma já estar ocupada por um PostgreSQL
-    # instalado nativamente na máquina.
+    # instalado nativamente na máquina (DB_PORT troca). Só este computador
+    # enxerga o banco.
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
