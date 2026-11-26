@@ -4,6 +4,17 @@ Este passo a passo leva do zero até o sistema aberto no navegador. Os comandos 
 
 Repositório: https://github.com/Di20232/mercadinho-seu-joao-redesign
 
+## Jeito mais rápido no Windows (2 cliques)
+
+1. Instale o **Docker Desktop** (https://www.docker.com/products/docker-desktop).
+2. No GitHub, abra o repositório e clique em **Code → Download ZIP**. Extraia o ZIP.
+3. Abra a pasta e dê dois cliques em **INICIAR.bat**. Se o Windows avisar que o arquivo veio da internet, clique em **Mais informações → Executar assim mesmo**.
+4. Na primeira vez, informe seu nome, e-mail e uma senha: é a conta do dono. O navegador abre em `http://localhost:3100`.
+
+Para desligar, use o **PARAR.bat**. Os dados ficam guardados no Docker e voltam ao ligar de novo. Esse sistema é o do seu computador: o banco não é o mesmo do site publicado.
+
+O resto deste tutorial é o passo a passo manual.
+
 ## 1. O que instalar antes
 
 | Programa | Para quê | Versão | Download |
